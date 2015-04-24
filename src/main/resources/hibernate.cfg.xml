@@ -264,9 +264,13 @@
    	    <mapping resource="报装/worklog.hbm.xml" />
 
 
+ 		<!-- 转气转费 -->
+   	    <mapping resource="营收/switchmoney.hbm.xml" />
+   	     <!-- 转气转费记录补打 -->
+   	    <mapping resource="营收/switchmoneyrepairb.hbm.xml" />
 
-
-
+ <!-- 押金 -->
+   	    <mapping resource="营收/yajin.hbm.xml" />
 
 
 

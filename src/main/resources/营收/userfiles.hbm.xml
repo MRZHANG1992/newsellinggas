@@ -420,6 +420,9 @@
 		<property name="f_toBeInspected" type="string"/>
 		<!--下次安检日期-->
 		<property name="f_nextCheckDate" type="date"/>
+		<!-- ***************押金*************** -->
+		<!--押金-->
+		<property name="f_yajin" type="string"/>
 		
 </class>
 </hibernate-mapping>

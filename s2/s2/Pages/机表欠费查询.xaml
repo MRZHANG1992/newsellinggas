@@ -133,7 +133,7 @@
 							</Grid>
 							<Grid   Background="#FFC3E4FD" toolkit:DockPanel.Dock="Bottom">
 								<sdk:DataPager x:Name="pager2" Source="{Binding ItemsSource.Count, Converter={StaticResource DataPagerConverter}, ElementName=daninfos}" Margin="0,0,0,27" PageSize="40" d:LayoutOverrides="Width"   />
- 
+
                         <TextBlock TextWrapping="Wrap" Text="{m:Exp Str=$共\{daninfos.ItemsSource.Count\}项 总金额\{daninfos.ItemsSource.fee.MathRound(2)\}元 总欠费\{daninfos.ItemsSource.c\}次}"  TextAlignment="Right" Margin="68,26,0,1" />
  
 								
@@ -145,6 +145,7 @@
 							<sdk:DataGrid x:Name="daninfos" Margin="0,0,0,3" IsReadOnly="True" a:DataGridAttach.ServerSort="True"
 								AutoGenerateColumns="False" Width="1120" Background="{x:Null}">
 								<a:Data.Items>
+                            <!--\,round((fee-f_zhye)\,2) sjqfje -->
 									<o:PagedList x:Name="daninfoslist" WebClientInfo="{StaticResource dbclient}"
 									Order="asc" SortName="address" SortNames="用户编号:a.f_userid,地址:a.address"
 									Names="f_userid,f_username,districtname,address,f_phone,f_inputtor,f_payment,lastinputdate,lastinputgasnum,lastrecord,oughtamount,oughtfee,f_gasprice,fee,f_zhye,qianfei,c,yue"
@@ -171,7 +172,7 @@ t_handplan where shifoujiaofei\=\'否\' and f_state\=\'已抄表\' and
 									HQL="{m:Exp Str=$
 select a.f_userid f_userid\,a.f_username f_username\,a.districtname districtname\,a.address address\,a.f_phone f_phone\,a.f_inputtor f_inputtor\,a.f_payment f_payment\,
 b.lastinputdate lastinputdate\,b.lastinputgasnum lastinputgasnum\,b.lastrecord lastrecord\,b.oughtamount oughtamount\,round(b.oughtfee\,2) oughtfee\,b.f_gasprice f_gasprice\,a.fee fee\,
-a.f_zhye f_zhye\,round(fee-a.f_zhye\,2)qianfei\,a.c c\,a.yue yue
+a.f_zhye f_zhye\,round(fee-a.f_zhye\,2)qianfei\,a.c c\,a.yue yue\
  from
 (select h.m\,u.f_userid\, u.f_username\,u.f_districtname districtname\, 
 u.f_address address\, u.f_phone\,u.f_inputtor\, u.f_payment\,  
@@ -203,13 +204,13 @@ t_handplan where shifoujiaofei\=\'否\' and f_state\=\'已抄表\' and
 									<sdk:DataGridTextColumn Header="上次抄表底数" Binding="{Binding lastinputgasnum}"/>
 									<sdk:DataGridTextColumn Header="本次抄表底数" Binding="{Binding lastrecord}"/>
 									<sdk:DataGridTextColumn Header="本次应交气量" Binding="{Binding oughtamount}"/>
-									<sdk:DataGridTextColumn Header="本次应交金额" Binding="{Binding oughtfee}"/>
- 
-								    <sdk:DataGridTextColumn Header="总欠费金额" Binding="{Binding fee, StringFormat=F2}"/>
-                                    <sdk:DataGridTextColumn Header="欠费次数" Binding="{Binding c}"/>
+                            <sdk:DataGridTextColumn Header="本次应交金额" Binding="{Binding oughtfee}"/>
+                            <sdk:DataGridTextColumn Header="总欠费金额" Binding="{Binding fee, StringFormat=F2}"/>
+                            <!-- <sdk:DataGridTextColumn Header="实际欠费金额" Binding="{Binding sjqfje}"/>-->
+                            <sdk:DataGridTextColumn Header="欠费次数" Binding="{Binding c}"/>
 								    <sdk:DataGridTextColumn Header="上次结余" Binding="{Binding f_zhye}"/>
- 
-								</sdk:DataGrid.Columns>
+                            
+                        </sdk:DataGrid.Columns>
 							</sdk:DataGrid>
 				</toolkit:DockPanel>
 					</c:BusyIndicatorEx>
