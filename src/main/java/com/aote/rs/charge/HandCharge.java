@@ -22,10 +22,8 @@ import org.apache.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.Hibernate;
 import org.hibernate.HibernateException;
 import org.hibernate.Query;
-import org.hibernate.SQLQuery;
 import org.hibernate.Session;
 import org.hibernate.collection.PersistentSet;
 import org.hibernate.proxy.map.MapProxy;
@@ -34,13 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.orm.hibernate3.HibernateCallback;
 import org.springframework.orm.hibernate3.HibernateTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
-import sunw.io.Serializable;
-
-import com.aote.rs.charge.HandCharge.HibernateSQLCall;
 import com.aote.rs.util.RSException;
 
 @Path("handcharge")
@@ -52,11 +44,24 @@ public class HandCharge {
 	@Autowired
 	private HibernateTemplate hibernateTemplate;
 
-	private int stairmonths;
+	//private int stairmonths;
 
 	private String stardate;
 	private String enddate;
 
+	// 总累计购气量
+	BigDecimal sumamont = new BigDecimal(0);
+
+	// 计算阶梯气价的中间结果
+	BigDecimal stair1num = new BigDecimal(0);
+	BigDecimal stair2num = new BigDecimal(0);
+	BigDecimal stair3num = new BigDecimal(0);
+	BigDecimal stair4num = new BigDecimal(0);
+	BigDecimal stair1fee = new BigDecimal(0);
+	BigDecimal stair2fee = new BigDecimal(0);
+	BigDecimal stair3fee = new BigDecimal(0);
+	BigDecimal stair4fee = new BigDecimal(0);
+	
 	// 抄表单下载，返回JSON串
 	// operator 抄表员中文名
 	@GET
@@ -139,6 +144,84 @@ public class HandCharge {
 		}
 	}
 
+	// 根据前台录入购气量计算各阶梯气量金额
+	@GET
+	@Path("/num/{userid}/{pregas}/{enddate}")
+	public JSONObject pregas(@PathParam("userid") String userid, // 用户编号
+			@PathParam("pregas") double pregas, // 用气量
+			@PathParam("enddate") String enddate // 结束日期, 格式为yyyymmdd
+	) {
+		final String usersql = "select isnull(f_stairtype,'未设')f_stairtype, isnull(f_gasprice,0)f_gasprice, "
+				+ "isnull(f_stair1amount,0)f_stair1amount,isnull(f_stair2amount,0)f_stair2amount,"
+				+ "isnull(f_stair3amount,0)f_stair3amount,isnull(f_stair1price,0)f_stair1price,"
+				+ "isnull(f_stair2price,0)f_stair2price,isnull(f_stair3price,0)f_stair3price,"
+				+ "isnull(f_stair4price,0)f_stair4price,isnull(f_stairmonths,0)f_stairmonths,isnull(f_zhye,0)f_zhye "
+				+ "from t_userfiles where f_userid = '" + userid + "'";
+		List<Map<String, Object>> list = (List<Map<String, Object>>) hibernateTemplate
+				.execute(new HibernateCallback() {
+					public Object doInHibernate(Session session)
+							throws HibernateException {
+						Query q = session.createSQLQuery(usersql);
+						q
+								.setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP);
+						List result = q.list();
+						return result;
+					}
+				});
+		// 取出阶梯气价资料
+		Map<String, Object> map = (Map<String, Object>) list.get(0);
+		BigDecimal gasprice = new BigDecimal(map.get("f_gasprice").toString());
+		BigDecimal stair1amount = new BigDecimal(map.get("f_stair1amount")
+				.toString());
+		BigDecimal stair2amount = new BigDecimal(map.get("f_stair2amount")
+				.toString());
+		BigDecimal stair3amount = new BigDecimal(map.get("f_stair3amount")
+				.toString());
+		BigDecimal stair1price = new BigDecimal(map.get("f_stair1price")
+				.toString());
+		BigDecimal stair2price = new BigDecimal(map.get("f_stair2price")
+				.toString());
+		BigDecimal stair3price = new BigDecimal(map.get("f_stair3price")
+				.toString());
+		BigDecimal stair4price = new BigDecimal(map.get("f_stair4price")
+				.toString());
+		int stairmonths = Integer.parseInt(map.get("f_stairmonths").toString());
+		String stairtype = map.get("f_stairtype").toString();
+
+		// 转换结束日期
+		Calendar cal = Calendar.getInstance();
+		int year = Integer.parseInt(enddate.substring(0, 4));
+		int month = Integer.parseInt(enddate.substring(4, 6));
+		int day = Integer.parseInt(enddate.substring(6, 8));
+		cal.set(year, month - 1, day);
+
+		BigDecimal chargenum = stair(userid, new BigDecimal(pregas), cal,
+				stairtype, gasprice, stairmonths, stair1amount, stair2amount,
+				stair3amount, stair1price, stair2price, stair3price,
+				stair4price);
+
+		Map sell = new HashMap();
+		sell.put("f_stair1amount", stair1num);
+		sell.put("f_stair2amount", stair2num);
+		sell.put("f_stair3amount", stair3num);
+		sell.put("f_stair4amount", stair4num);
+		sell.put("f_stair1fee", stair1fee);
+		sell.put("f_stair2fee", stair2fee);
+		sell.put("f_stair3fee", stair3fee);
+		sell.put("f_stair4fee", stair4fee);
+		sell.put("f_stair1price", stair1price);
+		sell.put("f_stair2price", stair2price);
+		sell.put("f_stair3price", stair3price);
+		sell.put("f_stair4price", stair4price);
+		sell.put("f_allamont", sumamont);
+		sell.put("f_chargenum", chargenum);
+		sell.put("f_stardate", stardate);
+		sell.put("f_enddate", enddate);
+
+		JSONObject json = (JSONObject) new JsonTransfer().MapToJson(sell);
+		return json;
+	}
+
 	// 单块表抄表录入的内部方法，支持卡表及机表，卡表可录入余气量。
 	public String afrecordInput(String userid, double reading,
 			String sgnetwork, String sgoperator, String lastinputdate,
@@ -154,16 +237,8 @@ public class HandCharge {
 		// 下面程序执行hql变量
 		String hql = "";
 		// Map<String, String> singles = getSingles();// 获取所有单值
-		BigDecimal chargenum = new BigDecimal(0);
-		BigDecimal stair1num = new BigDecimal(0);
-		BigDecimal stair2num = new BigDecimal(0);
-		BigDecimal stair3num = new BigDecimal(0);
-		BigDecimal stair4num = new BigDecimal(0);
-		BigDecimal stair1fee = new BigDecimal(0);
-		BigDecimal stair2fee = new BigDecimal(0);
-		BigDecimal stair3fee = new BigDecimal(0);
-		BigDecimal stair4fee = new BigDecimal(0);
-		BigDecimal sumamont = new BigDecimal(0);
+		//BigDecimal chargenum = new BigDecimal(0);
+		//BigDecimal sumamont = new BigDecimal(0);
 		BigDecimal gasprice = new BigDecimal(map.get("f_gasprice").toString());
 		String stairtype = map.get("f_stairtype").toString();
 		BigDecimal stair1amount = new BigDecimal(map.get("f_stair1amount")
@@ -180,7 +255,7 @@ public class HandCharge {
 				.toString());
 		BigDecimal stair4price = new BigDecimal(map.get("f_stair4price")
 				.toString());
-		stairmonths = Integer.parseInt(map.get("f_stairmonths").toString());
+		int stairmonths = Integer.parseInt(map.get("f_stairmonths").toString());
 		// 上期读数（上期的本次抄表底数）上期底数（）
 		BigDecimal lastReading = new BigDecimal(map.get("lastinputgasnum") + "");
 		// 气量
@@ -229,132 +304,10 @@ public class HandCharge {
 		String meterState = meterstate;
 		// 针对设置阶梯气价的用户运算
 		// 阶梯起价处理
-		CountDate();
-		if (!stairtype.equals("未设")) {
-			final String gassql = " select isnull(sum(oughtamount),0)oughtamount from t_handplan "
-					+ "where f_userid='"
-					+ userid
-					+ "' and lastinputdate>='"
-					+ stardate + "' and lastinputdate<='" + enddate + "'";
-			List<Map<String, Object>> gaslist = (List<Map<String, Object>>) hibernateTemplate
-					.execute(new HibernateCallback() {
-						public Object doInHibernate(Session session)
-								throws HibernateException {
-							Query q = session.createSQLQuery(gassql);
-							q.setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP);
-							List result = q.list();
-							return result;
-						}
-					});
-			Map<String, Object> gasmap = (Map<String, Object>) gaslist.get(0);
-			// 当前购气量
-			sumamont = new BigDecimal(gasmap.get("oughtamount").toString());
-			// 累计购气量
-			BigDecimal allamont = sumamont.add(gas);
-			// 当前购气量在第一阶梯
-			if (sumamont.compareTo(stair1amount) < 0) {
-				if (allamont.compareTo(stair1amount) < 0) {
-					stair1num = gas;
-					stair1fee = gas.multiply(stair1price);
-					chargenum = gas.multiply(stair1price);
-				} else if (allamont.compareTo(stair1amount) >= 0
-						&& allamont.compareTo(stair2amount) < 0) {
-					stair1num = stair1amount.subtract(sumamont);
-					stair1fee = (stair1amount.subtract(sumamont))
-							.multiply(stair1price);
-					stair2num = allamont.subtract(stair1amount);
-					stair2fee = (allamont.subtract(stair1amount))
-							.multiply(stair2price);
-					chargenum = stair1fee.add(stair2fee);
-				} else if (allamont.compareTo(stair2amount) >= 0
-						&& allamont.compareTo(stair3amount) < 0) {
-					stair1num = stair1amount.subtract(sumamont);
-					stair1fee = (stair1amount.subtract(sumamont))
-							.multiply(stair1price);
-					stair2num = stair2amount.subtract(stair1amount);
-					stair2fee = (stair2amount.subtract(stair1amount))
-							.multiply(stair2price);
-					stair3num = allamont.subtract(stair2amount);
-					stair3fee = (allamont.subtract(stair2amount))
-							.multiply(stair3price);
-					chargenum = stair1fee.add(stair2fee).add(stair3fee);
-				} else if (allamont.compareTo(stair3amount) >= 0) {
-					stair1num = stair1amount.subtract(sumamont);
-					stair1fee = (stair1amount.subtract(sumamont))
-							.multiply(stair1price);
-					stair2num = stair2amount.subtract(stair1amount);
-					stair2fee = (stair2amount.subtract(stair1amount))
-							.multiply(stair2price);
-					stair3num = stair3amount.subtract(stair2amount);
-					stair3fee = (stair3amount.subtract(stair2amount))
-							.multiply(stair3price);
-					stair4num = allamont.subtract(stair3amount);
-					stair4fee = (allamont.subtract(stair3amount))
-							.multiply(stair4price);
-					chargenum = stair1fee.add(stair2fee).add(stair3fee)
-							.add(stair4fee);
-				}
-				// 当前已购气量在阶梯二内
-			} else if (sumamont.compareTo(stair1amount) >= 0
-					&& sumamont.compareTo(stair2amount) < 0) {
-				if (allamont.compareTo(stair2amount) < 0) {
-					stair2num = gas;
-					stair2fee = gas.multiply(stair2price);
-					chargenum = stair2fee;
-				} else if (allamont.compareTo(stair2amount) >= 0
-						&& allamont.compareTo(stair3amount) < 0) {
-					stair2num = stair2amount.subtract(sumamont);
-					stair2fee = (stair2amount.subtract(sumamont))
-							.multiply(stair2price);
-					stair3num = allamont.subtract(stair2amount);
-					stair3fee = (allamont.subtract(stair2amount))
-							.multiply(stair3price);
-					chargenum = stair2fee.add(stair3fee);
-				} else {
-					stair2num = stair2amount.subtract(sumamont);
-					stair2fee = (stair2amount.subtract(sumamont))
-							.multiply(stair2price);
-					stair3num = stair3amount.subtract(stair2amount);
-					stair3fee = (stair3amount.subtract(stair2amount))
-							.multiply(stair3price);
-					stair4num = allamont.subtract(stair3amount);
-					stair4fee = (allamont.subtract(stair3amount))
-							.multiply(stair4price);
-					chargenum = stair2fee.add(stair3fee).add(stair4fee);
-				}
-				// 当前已购气量在阶梯三内
-			} else if (sumamont.compareTo(stair2amount) >= 0
-					&& sumamont.compareTo(stair3amount) < 0) {
-				if (allamont.compareTo(stair3amount) < 0) {
-					stair3num = gas;
-					stair3fee = gas.multiply(stair3price);
-					chargenum = stair3fee;
-				} else {
-					stair3num = stair3amount.subtract(sumamont);
-					stair3fee = (stair3amount.subtract(sumamont))
-							.multiply(stair3price);
-					stair4num = allamont.subtract(stair3amount);
-					stair4fee = (allamont.subtract(stair3amount))
-							.multiply(stair4price);
-					chargenum = stair3fee.add(stair4fee);
-				}
-				// 当前已购气量超过阶梯三
-			} else if (sumamont.compareTo(stair3amount) >= 0) {
-				stair4num = gas;
-				stair4fee = gas.multiply(stair4price);
-				chargenum = stair4fee;
-			}
-		} else {
-			chargenum = gas.multiply(gasprice);
-			stair1num = new BigDecimal(0);
-			stair2num = new BigDecimal(0);
-			stair3num = new BigDecimal(0);
-			stair4num = new BigDecimal(0);
-			stair1fee = new BigDecimal(0);
-			stair2fee = new BigDecimal(0);
-			stair3fee = new BigDecimal(0);
-			stair4fee = new BigDecimal(0);
-		}
+		BigDecimal chargenum = stair(userid, gas, Calendar.getInstance(),
+				stairtype, gasprice, stairmonths, stair1amount, stair2amount,
+				stair3amount, stair1price, stair2price, stair3price,
+				stair4price);
 		// 气费大于0,结余够，前面无欠费，自动下账
 		if (chargenum.compareTo(BigDecimal.ZERO) > 0
 				&& chargenum.compareTo(f_zhye) < 0 && items < 1) {
@@ -539,6 +492,150 @@ public class HandCharge {
 		return userid;
 	}
 
+	// 计算阶梯气价，由于重构原因，会返回sumamont，放在全局变量里
+	// 计算出来的各阶段阶梯气量及阶梯金额存放在类变量里
+	// 返回：总价格
+	private BigDecimal stair(String userid, BigDecimal gas, Calendar cal,
+			String stairtype, BigDecimal gasprice, int stairmonths,
+			BigDecimal stair1amount, BigDecimal stair2amount,
+			BigDecimal stair3amount, BigDecimal stair1price,
+			BigDecimal stair2price, BigDecimal stair3price,
+			BigDecimal stair4price) {
+		BigDecimal chargenum = new BigDecimal(0);
+		// 针对设置阶梯气价的用户运算
+		CountDate(cal, stairmonths);
+		if (!stairtype.equals("未设")) {
+			final String gassql = " select isnull(sum(oughtamount),0)oughtamount from t_handplan "
+					+ "where f_userid='"
+					+ userid
+					+ "' and lastinputdate>='"
+					+ stardate + "' and lastinputdate<='" + enddate + "'";
+			List<Map<String, Object>> gaslist = (List<Map<String, Object>>) hibernateTemplate
+					.execute(new HibernateCallback() {
+						public Object doInHibernate(Session session)
+								throws HibernateException {
+							Query q = session.createSQLQuery(gassql);
+							q
+									.setResultTransformer(Transformers.ALIAS_TO_ENTITY_MAP);
+							List result = q.list();
+							return result;
+						}
+					});
+			Map<String, Object> gasmap = (Map<String, Object>) gaslist.get(0);
+			// 当前购气量
+			BigDecimal sumamont = new BigDecimal(gasmap.get("oughtamount")
+					.toString());
+			// 累计购气量
+			BigDecimal allamont = sumamont.add(gas);
+			// 当前购气量在第一阶梯
+			if (sumamont.compareTo(stair1amount) < 0) {
+				if (allamont.compareTo(stair1amount) < 0) {
+					stair1num = gas;
+					stair1fee = gas.multiply(stair1price);
+					chargenum = gas.multiply(stair1price);
+				} else if (allamont.compareTo(stair1amount) >= 0
+						&& allamont.compareTo(stair2amount) < 0) {
+					stair1num = stair1amount.subtract(sumamont);
+					stair1fee = (stair1amount.subtract(sumamont))
+							.multiply(stair1price);
+					stair2num = allamont.subtract(stair1amount);
+					stair2fee = (allamont.subtract(stair1amount))
+							.multiply(stair2price);
+					chargenum = stair1fee.add(stair2fee);
+				} else if (allamont.compareTo(stair2amount) >= 0
+						&& allamont.compareTo(stair3amount) < 0) {
+					stair1num = stair1amount.subtract(sumamont);
+					stair1fee = (stair1amount.subtract(sumamont))
+							.multiply(stair1price);
+					stair2num = stair2amount.subtract(stair1amount);
+					stair2fee = (stair2amount.subtract(stair1amount))
+							.multiply(stair2price);
+					stair3num = allamont.subtract(stair2amount);
+					stair3fee = (allamont.subtract(stair2amount))
+							.multiply(stair3price);
+					chargenum = stair1fee.add(stair2fee).add(stair3fee);
+				} else if (allamont.compareTo(stair3amount) >= 0) {
+					stair1num = stair1amount.subtract(sumamont);
+					stair1fee = (stair1amount.subtract(sumamont))
+							.multiply(stair1price);
+					stair2num = stair2amount.subtract(stair1amount);
+					stair2fee = (stair2amount.subtract(stair1amount))
+							.multiply(stair2price);
+					stair3num = stair3amount.subtract(stair2amount);
+					stair3fee = (stair3amount.subtract(stair2amount))
+							.multiply(stair3price);
+					stair4num = allamont.subtract(stair3amount);
+					stair4fee = (allamont.subtract(stair3amount))
+							.multiply(stair4price);
+					chargenum = stair1fee.add(stair2fee).add(stair3fee).add(
+							stair4fee);
+				}
+				// 当前已购气量在阶梯二内
+			} else if (sumamont.compareTo(stair1amount) >= 0
+					&& sumamont.compareTo(stair2amount) < 0) {
+				if (allamont.compareTo(stair2amount) < 0) {
+					stair2num = gas;
+					stair2fee = gas.multiply(stair2price);
+					chargenum = stair2fee;
+				} else if (allamont.compareTo(stair2amount) >= 0
+						&& allamont.compareTo(stair3amount) < 0) {
+					stair2num = stair2amount.subtract(sumamont);
+					stair2fee = (stair2amount.subtract(sumamont))
+							.multiply(stair2price);
+					stair3num = allamont.subtract(stair2amount);
+					stair3fee = (allamont.subtract(stair2amount))
+							.multiply(stair3price);
+					chargenum = stair2fee.add(stair3fee);
+				} else {
+					stair2num = stair2amount.subtract(sumamont);
+					stair2fee = (stair2amount.subtract(sumamont))
+							.multiply(stair2price);
+					stair3num = stair3amount.subtract(stair2amount);
+					stair3fee = (stair3amount.subtract(stair2amount))
+							.multiply(stair3price);
+					stair4num = allamont.subtract(stair3amount);
+					stair4fee = (allamont.subtract(stair3amount))
+							.multiply(stair4price);
+					chargenum = stair2fee.add(stair3fee).add(stair4fee);
+				}
+				// 当前已购气量在阶梯三内
+			} else if (sumamont.compareTo(stair2amount) >= 0
+					&& sumamont.compareTo(stair3amount) < 0) {
+				if (allamont.compareTo(stair3amount) < 0) {
+					stair3num = gas;
+					stair3fee = gas.multiply(stair3price);
+					chargenum = stair3fee;
+				} else {
+					stair3num = stair3amount.subtract(sumamont);
+					stair3fee = (stair3amount.subtract(sumamont))
+							.multiply(stair3price);
+					stair4num = allamont.subtract(stair3amount);
+					stair4fee = (allamont.subtract(stair3amount))
+							.multiply(stair4price);
+					chargenum = stair3fee.add(stair4fee);
+				}
+				// 当前已购气量超过阶梯三
+			} else if (sumamont.compareTo(stair3amount) >= 0) {
+				stair4num = gas;
+				stair4fee = gas.multiply(stair4price);
+				chargenum = stair4fee;
+			}
+			// 该用户未设置阶梯气价
+		} else {
+			chargenum = gas.multiply(gasprice);
+			stair1num = new BigDecimal(0);
+			stair2num = new BigDecimal(0);
+			stair3num = new BigDecimal(0);
+			stair4num = new BigDecimal(0);
+			stair1fee = new BigDecimal(0);
+			stair2fee = new BigDecimal(0);
+			stair3fee = new BigDecimal(0);
+			stair4fee = new BigDecimal(0);
+		}
+
+		return chargenum;
+	}
+
 	/**
 	 * 保存用户财务明细
 	 */
@@ -683,9 +780,9 @@ public class HandCharge {
 	}
 
 	// 计算开始时间方法
-	private void CountDate() {
+	private void CountDate(Calendar cal, int stairmonths) {
 		// 计算当前月在哪个阶梯区间
-		Calendar cal = Calendar.getInstance();
+		//Calendar cal = Calendar.getInstance();
 		int thismonth = cal.get(Calendar.MONTH) + 1;
 		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
 		if (stairmonths == 1) {
