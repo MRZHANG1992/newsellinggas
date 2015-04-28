@@ -1,4 +1,4 @@
-﻿<?xml version="1.0"  encoding='utf-8'?>
+<?xml version="1.0"  encoding='utf-8'?>
 <!DOCTYPE hibernate-mapping PUBLIC 
 	"-//Hibernate/Hibernate Mapping DTD 3.0//EN"
 	"http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
@@ -8,7 +8,8 @@
 		<id name="id" type="int">
 			<generator class="identity"></generator>
 		</id>
-		<!--用户编号-->
+			<version name="version"></version>
+	 	<!--用户编号-->
 		<!-- property name="f_userinfoid" type="string" /-->
 		<!--用户档案 -->
 		<many-to-one name="f_userinfoid" entity-name="t_userinfo"></many-to-one>
@@ -420,6 +421,9 @@
 		<property name="f_toBeInspected" type="string"/>
 		<!--下次安检日期-->
 		<property name="f_nextCheckDate" type="date"/>
+		<!-- ***************押金*************** -->
+		<!--押金-->
+		<property name="f_yajin" type="string"/>
 		
 </class>
 </hibernate-mapping>

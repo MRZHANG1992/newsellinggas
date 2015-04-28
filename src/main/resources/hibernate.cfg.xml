@@ -1,4 +1,4 @@
-﻿<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE hibernate-configuration PUBLIC
         "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
         "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
@@ -12,8 +12,8 @@
 		<!-- SQL dialect -->
 		<property name="dialect">org.hibernate.dialect.SQLServerDialect</property>
 
-		<!-- Enable Hibernate's automatic session context management -->
-		<property name="current_session_context_class">thread</property>
+		<!-- Enable Hibernate's automatic session context management
+		<property name="current_session_context_class">thread</property> -->
 
 		<!-- Disable the second-level cache  -->
 		<property name="cache.provider_class">org.hibernate.cache.NoCacheProvider</property>
@@ -264,9 +264,13 @@
    	    <mapping resource="报装/worklog.hbm.xml" />
 
 
+ 		<!-- 转气转费 -->
+   	    <mapping resource="营收/switchmoney.hbm.xml" />
+   	     <!-- 转气转费记录补打 -->
+   	    <mapping resource="营收/switchmoneyrepairb.hbm.xml" />
 
-
-
+ <!-- 押金 -->
+   	    <mapping resource="营收/yajin.hbm.xml" />
 
 
 

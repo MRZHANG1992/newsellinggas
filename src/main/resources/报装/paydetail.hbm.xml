@@ -22,6 +22,8 @@
 		<property name="f_jiaokuanren" type="string"/>
 		<!--操作日期-->
 		<property name="f_date" type="date"/>
+		<!--状态-->
+		<property name="f_state" type="string"/>
 		<!-- 对应的报装编号 -->
 		<property name="applyid" type="int"/>
 	</class>

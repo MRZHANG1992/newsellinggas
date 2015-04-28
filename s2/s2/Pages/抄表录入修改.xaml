@@ -16,20 +16,46 @@
 	mc:Ignorable="d"
 	x:Class="Com.Aote.Pages.抄表录入修改" FontSize="13">
 
-    <Grid x:Name="LayoutRoot" Background="White">
+    <Grid x:Name="LayoutRoot" Background="White"> 
         <m:ResourceLoad x:Name="loader" Margin="0">
             <o:PagedObjectList Name="personlist" WebClientInfo="{StaticResource dbclient}" 
-                     Path="{m:Exp Str=$ from t_handplan where \{searchHandUserUnit.DataContext.Condition\} }"
+                    Path="{m:Exp Str=$from t_handplan where \{searchHandUserUnit.DataContext.Condition\} }"
 					IsOld="{m:Exp Str=SaveAction.State\=\=$End$}"
 					 PageIndex="{m:Exp Str=pager.PageIndex}" PageSize="{m:Exp Str=pager.PageSize}"
-					  SumNames=","/>
+					 SumNames=","/>
             <!--抄表对象-->
             <o:GeneralObject Name="scbdw" WebClientInfo="{StaticResource dbclient}"   EntityType="t_handplan"
 				  IsInit="{m:Exp Str=SaveAction.State\=\=$End$}" Source="{m:Exp Str=handUserUnits.SelectedItem}"/>
+            
+            <!-- 更新抄表对象 -->
+            <b:HQLAction Name="updateHandplan" WebClientInfo="{StaticResource server}">
+                <b:HQLAction.HQL>
+                <m:Exp Str="$update t_handplan set lastrecord={scbdw.lastrecord}, oughtfee={scbdw.oughtfee},
+                shifoujiaofei='{scbdw.shifoujiaofei}', f_operator='{scbdw.f_operator}', f_inputtor='{scbdw.f_inputtor}',
+                f_zhinajindate='{scbdw.f_zhinajindate}', oughtamount={scbdw.oughtamount},
+                lastinputgasnum={scbdw.lastinputgasnum}
+                where id={scbdw.id}">
+                </m:Exp>
+                </b:HQLAction.HQL>
+            </b:HQLAction>
+
+            <!-- 更新用户档案, 抄表记录已交：用户余额=当前余额+原扣除额-现扣除额 -->
+            <b:HQLAction Name="updateUserfile" WebClientInfo="{StaticResource server}">
+                <b:HQLAction.HQL>
+                    <m:Exp Str="
+                $update t_userfiles set lastinputgasnum={scbdw.lastrecord}, 
+                f_zhye={scbdw.shifoujiaofei==$是$:$f_zhye+{handUserUnits.SelectedItem.oughtfee}-{scbdw.oughtfee}$, $f_zhye$} 
+                where f_userid={scbdw.f_userid}">
+                    </m:Exp>
+                </b:HQLAction.HQL>
+            </b:HQLAction>
+            
             <!--批处理-->
             <b:BatchExcuteAction Name="SaveAction"  WebClientInfo="{StaticResource dbclient}">
-                <!--抄表-->
-                <b:BatchInfo Source="{m:Exp Str=handUserUnit.DataContext}" MethodName="SaveToJson"/>
+                <!--抄表记录保存-->
+                <b:BatchInfo Source="{m:Exp Str=updateHandplan}" MethodName="InvokeToJson"/>
+                <!--用户档案更新-->
+                <b:BatchInfo Source="{m:Exp Str=updateUserfile}" MethodName="InvokeToJson"/>
             </b:BatchExcuteAction>
         </m:ResourceLoad>
         <Border BorderThickness="1" Margin="0" CornerRadius="3"  Padding="0">
@@ -52,18 +78,16 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="0.135*"/>
                             <ColumnDefinition Width="0.225*"/>
-                            <ColumnDefinition Width="0.135*"/>
-                            <ColumnDefinition Width="0.225*"/>
                             <ColumnDefinition Width="0.64*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="0.44*"/>
                             <RowDefinition Height="0.56*"/>
                         </Grid.RowDefinitions>
-                        <sdk:Label Content="卡      号：" Margin="0,5,0,6" RenderTransformOrigin="0.5,0.5"  HorizontalAlignment="Right" />
-                        <TextBox Text="{m:Bind Path=f_cardid}"  Margin="0,10,-1,5" HorizontalAlignment="Stretch" Width="Auto" VerticalAlignment="Stretch" Height="Auto" Grid.Column="1"  >
+                        <sdk:Label Content="用户编号：" Margin="0,5,0,6" RenderTransformOrigin="0.5,0.5"  HorizontalAlignment="Right" />
+                        <TextBox Text="{m:Bind Path=f_userid}"  Margin="0,10,-1,5" HorizontalAlignment="Stretch" Width="Auto" VerticalAlignment="Stretch" Height="Auto" Grid.Column="1"  >
                             <a:Data.Prop>
-                                <o:PropertySetter PropertyName="f_cardid" Operator="f_cardid = 'this'"/>
+                                <o:PropertySetter PropertyName="f_userid" Operator="f_userid = 'this'"/>
                             </a:Data.Prop>
                         </TextBox>
                         <sdk:Label Content="小区名称：" Margin="0,5,0,20" HorizontalAlignment="Right" Grid.Row="1" />
@@ -72,17 +96,11 @@
                                 <o:PropertySetter PropertyName="f_districtname" Operator="f_districtname like 'this%'"/>
                             </a:Data.Prop>
                         </TextBox>
-                        <Button Content="查询" x:Name="searchbutton" Click="{m:Exp Str=searchHandUserUnit.DataContext.Search()}" Width="100" Margin="9,0,0,20" HorizontalAlignment="Left"  Grid.Column="3"  Grid.Row="1"/>
-                        <sdk:Label Content="用户编号：" Margin="0,5,0,6" RenderTransformOrigin="0.5,0.5"  HorizontalAlignment="Right" Grid.Column="2" />
-                        <TextBox Text="{m:Bind Path=f_userid}"  Margin="0,10,0,5" HorizontalAlignment="Stretch" Width="Auto" VerticalAlignment="Stretch" Height="Auto" Grid.Column="3"  Grid.ColumnSpan="1"  >
-                            <a:Data.Prop>
-                                <o:PropertySetter PropertyName="f_userid" Operator="f_userid = 'this'"/>
-                            </a:Data.Prop>
-                        </TextBox>
+                        <Button Content="查询" x:Name="searchbutton" Click="{m:Exp Str=searchHandUserUnit.DataContext.Search()}" Width="100" Margin="9,0,0,20" HorizontalAlignment="Left"  Grid.Column="2"  Grid.Row="1"/>
                     </Grid>
                 </StackPanel>
-                <sdk:DataGrid x:Name="handUserUnits" ItemsSource="{m:Exp Str=personlist}" IsReadOnly="True" AutoGenerateColumns="False" Margin="0,70,323,-25" HorizontalAlignment="Stretch" Width="Auto" Grid.Row="1" Grid.RowSpan="2">
-
+                <sdk:DataGrid x:Name="handUserUnits" ItemsSource="{m:Exp Str=personlist}" IsReadOnly="True" AutoGenerateColumns="False" Margin="8,80,315,1.333" HorizontalAlignment="Stretch" Width="Auto" Grid.Row="1" d:LayoutOverrides="VerticalAlignment" Grid.RowSpan="2">
+                   
                     <sdk:DataGrid.Columns>
                         <sdk:DataGridTextColumn Header="序   号" d:IsLocked="True" Binding="{Binding Index}" />
                         <sdk:DataGridTextColumn Header="用户编号" Binding="{Binding f_userid}"/>
@@ -101,7 +119,7 @@
                         <sdk:DataGridTextColumn Header="录入日期" Binding="{Binding f_inputdate, StringFormat=yyyy-MM-dd}"/>
                     </sdk:DataGrid.Columns>
                 </sdk:DataGrid>
-                <sdk:DataPager x:Name="pager" Source="{Binding Path=ItemsSource.Count,ElementName=handUserUnits,Converter={StaticResource DataPagerConverter}}" PageSize="18" Margin="0,21.667,323,0" HorizontalAlignment="Stretch" Width="Auto" Grid.Row="3" VerticalAlignment="Top" Height="28" />
+                <sdk:DataPager x:Name="pager" Source="{Binding Path=ItemsSource.Count,ElementName=handUserUnits,Converter={StaticResource DataPagerConverter}}" PageSize="18" Margin="7,9.667,316,0" HorizontalAlignment="Stretch" Width="Auto" Grid.Row="3" VerticalAlignment="Top" Height="28" />
                 <Grid x:Name="handUserUnit" DataContext="{m:Exp Str=scbdw}"  Margin="-311,30,0,0" Height="Auto" VerticalAlignment="Stretch" HorizontalAlignment="Left" Width="524" Grid.Row="1" Grid.RowSpan="3" Grid.Column="1"  d:LayoutOverrides="GridBox">
 
                     <Grid.ColumnDefinitions>
@@ -178,12 +196,12 @@
                             <o:PropertySetter PropertyName="f_phone"  />
                         </a:Data.Prop>
                     </TextBox>
-                    <TextBox x:Name="ui_lastinputgasnum" Text="{m:Bind Path=lastinputgasnum}"   Margin="0,3,0,1" AllowDrop="True" Height="Auto" VerticalAlignment="Stretch" Grid.Row="6" Grid.Column="1" RenderTransformOrigin="0.5,1.318" HorizontalAlignment="Stretch" Width="Auto"   >
+                    <TextBox x:Name="ui_lastinputgasnum" Text="{m:Bind Path=lastinputgasnum}"   Margin="0,3,0,1" AllowDrop="True" Height="Auto" VerticalAlignment="Stretch" Grid.Row="6" Grid.Column="1" RenderTransformOrigin="0.5,1.318" HorizontalAlignment="Stretch" Width="Auto" LostFocus="ui_lastinputgasnum_LostFocus"  >
                         <a:Data.Prop>
                             <o:PropertySetter PropertyName="lastinputgasnum"   />
                         </a:Data.Prop>
                     </TextBox>
-                    <TextBox  x:Name="ui_lastrecord" Text="{m:Bind Path=lastrecord}"   Margin="1,3,0,2"  AllowDrop="True" Height="25" VerticalAlignment="Stretch" Grid.Row="7" Grid.Column="1" HorizontalAlignment="Stretch" Width="Auto" IsReadOnly="False" >
+                    <TextBox  x:Name="ui_lastrecord" Text="{m:Bind Path=lastrecord}"   Margin="1,3,0,2"  AllowDrop="True" Height="25" VerticalAlignment="Stretch" Grid.Row="7" Grid.Column="1" HorizontalAlignment="Stretch" Width="Auto" IsReadOnly="False" LostFocus="ui_lastinputgasnum_LostFocus">
                         <a:Data.Prop>
                             <o:PropertySetter PropertyName="lastrecord"/>
                         </a:Data.Prop>
@@ -242,7 +260,7 @@
                         </a:Data.Prop>
                     </TextBox>
                     <Button Content="保存"	
-                    IsEnabled="{m:Exp Str=handUserUnit.DataContext.id!\=null and !handUserUnit.DataContext.HasErrors}"        
+                            
 					Click="Button_Click" RenderTransformOrigin="1.7,0.6" Grid.Row="18" Grid.RowSpan="1"  Height="25" VerticalAlignment="Bottom" Grid.Column="3" HorizontalAlignment="Left" Width="62"/>
                     <Button Content="撤销" Margin="0,0,75,0" Click="{m:Exp Str=handUserUnit.DataContext.New()}" Grid.Row="18" Grid.Column="1"  Grid.RowSpan="1" HorizontalAlignment="Right" Width="66"  Height="25" VerticalAlignment="Bottom"/>
 
@@ -272,12 +290,6 @@
                             <o:PropertySetter PropertyName="oughtamount" />
                         </a:Data.Prop>
                     </TextBox>
-                    <sdk:Label Content="表状态："   Margin="0,4,4,7" Grid.Row="9" HorizontalAlignment="Right" d:LayoutOverrides="Height"/>
-                    <ComboBox x:Name="meterstate" ItemsSource="{m:Exp Str=meterstatelistnull}" DisplayMemberPath="name" SelectedValuePath="name" SelectedValue="{m:Bind Path=f_meterstate}"  Margin="0,3,0,2" Grid.Column="1" Grid.Row="9" Height="25" IsEnabled="true" FontSize="13.333" RenderTransformOrigin="-5.111,4.2">
-                        <a:Data.Prop>
-                            <o:PropertySetter PropertyName="f_meterstate"/>
-                        </a:Data.Prop>
-                    </ComboBox>
                     <sdk:Label Content="气价类型：" Margin="0,0,0,5" Grid.Row="5"  HorizontalAlignment="Right" RenderTransformOrigin="0.477,1.842" VerticalAlignment="Bottom" d:LayoutOverrides="GridBox"/>
                     <TextBox x:Name="ui_f_gaspricetype" Text="{m:Bind Path=f_gaspricetype}"  Margin="0,2,0,0"  AllowDrop="True" Height="26" VerticalAlignment="Top" Grid.Row="5" Grid.Column="1" HorizontalAlignment="Stretch" Width="Auto" IsReadOnly="True" d:LayoutOverrides="HorizontalAlignment">
                         <a:Data.Prop>
