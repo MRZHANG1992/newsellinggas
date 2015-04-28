@@ -28,7 +28,8 @@
 		  		Path="one/from t_singlevalue where name='发票格式'"   ></o:GeneralObject>	
 		
 		<!--卡对象GeneralICCard-->
-		<oo:NewGeneralICCard Name="card"   		
+		<oo:NewGeneralICCard Name="card"   	
+         CanRewriteCard="{m:Exp Str='SaveAction.State=>Completed==$End$'}" 
 		 Gas="{m:Exp Str=userfile.DataContext.f_pregas}"
 		 CardId="{m:Exp Str=userfile.DataContext.f_cardid}"
 		 Factory="{m:Exp Str='userfiles1.f_aliasname'}"
@@ -78,7 +79,7 @@
 		</o:GeneralObject>
 		
 		<!--保存对象 -->	
-		<b:BatchExcuteAction Name="SaveAction"  CanSave="{m:Exp Str=card.State\=\=$End$}" WebClientInfo="{StaticResource dbclient}">
+		<b:BatchExcuteAction Name="SaveAction"   WebClientInfo="{StaticResource dbclient}">
 			<b:BatchInfo Source="{m:Exp Str=userfiles1}" CanSave="{m:Exp Str=userfiles1.f_aliasname!\=$keluomu$}" MethodName="SaveToJson"/>
 			<b:BatchInfo Source="{m:Exp Str=userfile.DataContext}" MethodName="SaveToJson"/>
 		</b:BatchExcuteAction>
@@ -97,7 +98,7 @@
     					<!--print必须有用户发起;print.Print()  card.ReInitCard()-->
 						<Button x:Name="save" Content="写  卡" Margin="5" 
     						IsEnabled="{m:Exp Str=userfile.DataContext.IsModified and !userfile.DataContext.HasErrors}"
-    						Click="{m:Exp Str=userfiles1.f_times\=userfile.DataContext.f_aliasname\=\=$KaiYuanOld$:userfile.DataContext.f_ling.ToInt()\,userfile.DataContext.f_times.ToInt();card.Sqrq\=userfilego.f_recoverycarddate.ToString($yyyyMMdd$);card.ReInitCard()}" Width="50"/>
+    						Click="{m:Exp Str=userfiles1.f_times\=userfile.DataContext.f_aliasname\=\=$KaiYuanOld$:userfile.DataContext.f_ling.ToInt()\,userfile.DataContext.f_times.ToInt();card.Sqrq\=userfilego.f_recoverycarddate.ToString($yyyyMMdd$);SaveAction.Invoke()}" Width="50"/>
     					<Button Content="撤  销" Margin="5" Click="{m:Exp Str=userfile.DataContext.New()}" Width="50"/>
     				</toolkit:DockPanel>
     				<Grid toolkit:DockPanel.Dock="Top" Margin="0"  >
