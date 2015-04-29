@@ -27,10 +27,7 @@
 		<o:GeneralObject Name="fapiaogeshi" EntityType="t_singlevalue" WebClientInfo="{StaticResource dbclient}" 
 		  		Path="one/from t_singlevalue where name='发票格式'"   ></o:GeneralObject>	
 		
-		<!--卡对象GeneralICCard-->
-			<o:NewGeneralICCard Name="card" ></o:NewGeneralICCard> 
-
-      
+	
 		<!--打开窗口对象-->
 		<o:ChildWindowObj Name="openkafei" CWName="/Pages/高级管理员登录" />
 		<o:ChildWindowObj Name="openxiangou" CWName="/Pages/管理员登录" />
@@ -50,7 +47,7 @@
 			</b:HQLAction>
 
 		<!--保存对象 -->	
-		<b:BatchExcuteAction Name="SaveAction"  CanSave="{m:Exp Str=card.State\=\=$End$}" WebClientInfo="{StaticResource dbclient}">
+		<b:BatchExcuteAction Name="SaveAction"   WebClientInfo="{StaticResource dbclient}">
 		 	<b:BatchInfo Source="{m:Exp Str=userfile.DataContext}" MethodName="SaveToJson"/>
 		 	<b:BatchInfo Source="{m:Exp Str=updatebuka}" MethodName="InvokeToJson"/>
 		</b:BatchExcuteAction>
@@ -71,7 +68,7 @@
     					<!--print必须有用户发起;print.Print() card.MakeNewCard()-->
 						<Button x:Name="save" Content="保   存" Margin="5" 
     						IsEnabled="{m:Exp Str=!userfilego.HasErrors}"
-    						Click="{m:Exp Str=card.MakeNewCard()}" Width="50"/>
+    						Click="{m:Exp Str=SaveAction.Invoke()}" Width="50"/>
 
     					<Button Content="撤  销" Margin="5" Click="{m:Exp Str=userfile.DataContext.New()}" Width="50"/>
     				</toolkit:DockPanel>
