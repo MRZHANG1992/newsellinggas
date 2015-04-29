@@ -555,11 +555,11 @@
 								<sdk:DataGridTextColumn Header="用户类型" Binding="{Binding f_usertype}"/>
 								
 								<sdk:DataGridTextColumn Header="卡    费" Binding="{Binding f_cardfees}"/>
-								
-								
-								
-								
-								<sdk:DataGridTextColumn Header="补卡日期" Binding="{Binding f_recoverycarddate, StringFormat=yyyy-MM-dd}"/>
+                                    <sdk:DataGridTextColumn Header="写卡次数" Binding="{Binding f_times}"/>
+                                    <sdk:DataGridTextColumn Header="是否有效" Binding="{Binding f_payfeevalid}"/>
+
+                                    <sdk:DataGridTextColumn Header="补卡时间" Binding="{Binding f_recoverycardtime, StringFormat=hh:mm:ss tt}"/>
+                                    <sdk:DataGridTextColumn Header="补卡日期" Binding="{Binding f_recoverycarddate, StringFormat=yyyy-MM-dd}"/>
 							</sdk:DataGrid.Columns>
 						</sdk:DataGrid>
 					</toolkit:DockPanel>
