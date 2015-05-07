@@ -428,11 +428,14 @@ namespace s2.Pages
             //判断重复
             if (!IsDuplicated(false, newName))
             {
+                string cmd2 = synchronous(curItem, newName);
+                cmd2 = "{\"operator\":\"sql\", \"data\":\"" + cmd2 + "\"}";
                 curItem.Header = newName;
                 GeneralObject go = curItem.Tag as GeneralObject;
                 go.SetPropertyValue("col1", newName, false);
-                String cmd = String.Format("[{{\"operator\":\"sql\", \"data\":\"update t_design_address set name='{0}', remark='{1}' where id={2}\"}}]", new object[] { newName, (EditGrid.DataContext as SearchObject).GetPropertyValue("Remark"), go.GetPropertyValue("col7") });
-                BatchAction(cmd);
+                String cmd = String.Format("{{\"operator\":\"sql\", \"data\":\"update t_design_address set name='{0}', remark='{1}' where id={2}\"}}", new object[] { newName, (EditGrid.DataContext as SearchObject).GetPropertyValue("Remark"), go.GetPropertyValue("col7") });
+                string data = "[" + cmd + "," + cmd2 + "]";
+                BatchAction(data);
             }
             else
             {
@@ -441,6 +444,61 @@ namespace s2.Pages
                 return;
             }
                 
+        }
+
+        private string synchronous(TreeViewItem curItem, string newName)
+        {
+            string sql = "";
+            GeneralObject go = curItem.Tag as GeneralObject;
+            int level = Int32.Parse(go.GetPropertyValue("col3") + "");
+            switch (level)
+            {
+                case 0:
+                    sql = "update t_gasaddress set f_cusDom='" + newName + "' where f_cusDom='" + curItem.Header + "'";
+                    break;
+                case 1:
+                    sql = "update t_gasaddress set f_cusDy='" + newName + "' where f_cusDy='" + curItem.Header + "'";
+                    break;
+                case 2:
+                    sql = "update t_gasaddress set f_cusFloor='" + newName + "' where f_cusFloor='" + curItem.Header + "'";
+                    break;
+                case 3:
+                    sql = "update t_gasaddress set f_apartment='" + newName + "' where f_apartment='" + curItem.Header + "'";
+                    break;
+                default:
+                    break;
+            }
+            TreeViewItem tvi = curItem;
+            for (int i = level; i >= 0; i--)
+            {
+                switch (i)
+                {
+                    case 0:
+                        //小区
+                        string f_districtname = tvi.GetParentTreeViewItem().Header.ToString();
+                        sql += " and f_districtname='" + f_districtname + "' ";
+                        break;
+                    case 1:
+                        //楼号
+                        string f_cusDom = tvi.GetParentTreeViewItem().Header.ToString();
+                        sql += " and f_cusDom='" + f_cusDom + "' ";
+                        break;
+                    case 2:
+                        //单元
+                        string f_cusDy = tvi.GetParentTreeViewItem().Header.ToString();
+                        sql += " and f_cusDy='" + f_cusDy + "' ";
+                        break;
+                    case 3:
+                        //楼层
+                        string f_cusFloor = tvi.GetParentTreeViewItem().Header.ToString();
+                        sql += " and f_cusFloor='" + f_cusFloor + "' ";
+                        break;
+                    default:
+                        break;
+                }
+                tvi = tvi.GetParentTreeViewItem();
+            }
+            return sql;
         }
 
         private bool IsDuplicated(bool checkCurItem, string value)

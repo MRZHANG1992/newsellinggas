@@ -14,6 +14,8 @@
 		<property name="f_jisuannum" type="int"/>
 		<!--小区名称-->
 		<property name="f_districtname" type="string"/> 
+		<!--小区地址-->
+		<property name="f_address" type="string"/>
 		<!--单元号 -->
 		<property name="f_cusDy" type="string"/>
 		<!--楼号 -->
@@ -42,11 +44,13 @@
 		<property name="f_operator" type="string"/>
 		<!-- 操作日期 -->
 		<!--property name="f_date" type="date"/-->
-		<property name="f_date" type="string"/>
+		<property name="f_date" type="date"/>
 		<!-- 分公司 -->
 		<property name="f_filiale" type="string"/>
 		<!--街道 -->
 		<property name="f_road" type="string"/>
+		<!--建档状态 -->
+		<property name="f_state" type="string"/>
 		
 		
 		<!-- 秦华增加是否删除 -->

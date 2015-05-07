@@ -43,7 +43,7 @@ namespace Com.Aote.ObjectTools
         public void Invoke()
         {
             State = State.StartLoad;
-            this.isBusy = true;
+            this.IsBusy = true;
             //楼号
             string startbuild = this.GetPropertyValue("f_startbuild") + "";
             string endbuild = startbuild;
@@ -103,6 +103,8 @@ namespace Com.Aote.ObjectTools
                             go.WebClientInfo = this.WebClientInfo;
                             go.SetPropertyValue("f_road", this.GetPropertyValue("f_road") + "", true);
                             go.SetPropertyValue("f_districtname", this.GetPropertyValue("f_districtname") + "", true);
+                            go.SetPropertyValue("f_address", this.GetPropertyValue("f_address") + "", true);
+                            go.SetPropertyValue("f_state", this.GetPropertyValue("f_state") + "", true);
                             //设置楼号，有模式，按模式设置
                             string buildpattern = this.GetPropertyValue("f_buildpattern") + "";
                             string str = MatchPattern(build, buildpattern);
@@ -137,7 +139,7 @@ namespace Com.Aote.ObjectTools
             (sender as ObjectList).Completed -= plans_Completed;
             State = State.Loaded;
             this.OnPropertyChanged("State");
-            this.isBusy = false;
+            this.IsBusy = false;
         }
 
 

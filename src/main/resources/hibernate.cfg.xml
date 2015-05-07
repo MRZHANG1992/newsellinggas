@@ -299,6 +299,8 @@
    	    <mapping resource="营收/stairprice.hbm.xml" />
    	    <!-- 阶梯气价变更信息-->
    	    <mapping resource="营收/changestairprice.hbm.xml" />
+   	    <!-- 地址管理-->
+   	    <mapping resource="营收/design_address.hbm.xml" />
    	    
        
        <mapping resource="系统/repairsman.hbm.xml"/>
