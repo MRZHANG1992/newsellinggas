@@ -55,7 +55,7 @@
         <!--发卡费and SaveAction.State==$End$ users.ItemsSource.State\=\=$End$ and -->
 		<o:GeneralObject Name="fakafei" EntityType="t_singlevalue" WebClientInfo="{StaticResource dbclient}" 
 		       	Path="{m:Exp Str=users.SelectedItem.f_userid \!\= null:$one/from t_singlevalue where name \= \'\{LoginUser.f_fengongsi\}\{users.SelectedItem.f_usertype\}\卡\费\'$\,$aa$}"  
-				IsInit="{m:Exp Str='print1.State\=\=$End$'}" >
+				IsInit="{m:Exp Str=print1.State\=\=$End$ or print1.State\=\=$Cancle$}" >
         </o:GeneralObject>
 		<!--打开窗口对象-->
 		<o:ChildWindowObj Name="openkafei" CWName="/Pages/高级管理员登录" />
@@ -63,7 +63,7 @@
 		<!--补卡对象  and SaveAction.State==$End-->
 		<o:GeneralObject  Name="userfilego" WebClientInfo="{StaticResource dbclient}" 
     		EntityType="t_renewalcard" 
-    		IsInit="{m:Exp Str='print1.State\=\=$End$'}">
+    		IsInit="{m:Exp Str=print1.State\=\=$End$ or print1.State\=\=$Cancle$}">
 			<o:PropertySetter  PropertyName="f_renewalcardtype" Default="卡表补卡"/>
     		<o:PropertySetter  PropertyName="f_comtype" Default="天然气公司"/>
 		    <o:PropertySetter  PropertyName="f_payfeevalid" Default="有效"/>
@@ -72,7 +72,7 @@
 		<!--用户对象 IsInit="{m:Exp Str='SaveAction.State==$End$'}" -->
         <o:GeneralObject Name="userfiles1" EntityType="t_userfiles" WebClientInfo="{StaticResource dbclient}"
             Path="{m:Exp Str=users.SelectedItem.f_userid !\= null:$one/from t_userfiles where f_userid\=\'\{users.SelectedItem.f_userid\}\'$\,$abc$}" 
-			IsInit="{m:Exp Str='print1.State\=\=$End$'}">
+			IsInit="{m:Exp Str=print1.State\=\=$End$ or print1.State\=\=$Cancle$}">
 			<!--初始化卡标记-->
 			<o:PropertySetter PropertyName="f_initcardsellgas" NoDependValue="{m:Exp Str=SaveAction\=>Saving!\=null:$补卡$\,null}"/>
 		</o:GeneralObject>

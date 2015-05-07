@@ -151,8 +151,9 @@
                 <ColumnDefinition Width="0.75*"/>
             </Grid.ColumnDefinitions>
             <c:BusyIndicatorEx BusyContent="正在查询，请稍等" IsBusy="{m:Exp Str=areafiles.ItemsSource.IsBusy}" >
-                <Border BorderThickness="1" BorderBrush="#FF9AA2AB" Margin="0" Padding="2" Width="Auto" Height="Auto" VerticalAlignment="Stretch" >
-                    <toolkit:DockPanel Width="Auto"   >
+                <sdk:TabControl BorderThickness="1" BorderBrush="#FF9AA2AB" Margin="0" Padding="2" Width="Auto" Height="Auto" VerticalAlignment="Stretch" >
+                    <sdk:TabItem Header="小区建档">
+                    	<toolkit:DockPanel Width="Auto"   >
                         <toolkit:DockPanel   Background="{x:Null}" toolkit:DockPanel.Dock="Bottom" Margin="0,0,0,5" Height="22">
                             <TextBlock TextWrapping="Wrap" Text="{m:Exp Str=$共\{areafiles.ItemsSource.Count\}项}" Width="Auto" HorizontalAlignment="Right" Foreground="#FF140000" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
                             <sdk:DataPager x:Name="pager" Source="{Binding ItemsSource.Count, Converter={StaticResource DataPagerConverter}, ElementName=areafiles}"  Margin="0,0,0,-2" PageSize="20"/>
@@ -196,9 +197,56 @@
                                 <sdk:DataGridTextColumn Header="用气性质" Binding="{Binding f_gasproperties}"/>
                             </sdk:DataGrid.Columns>
                         </sdk:DataGrid>
-
                     </toolkit:DockPanel>
-                </Border>
+					</sdk:TabItem>
+					 <sdk:TabItem Header="地址建档">
+                    	<toolkit:DockPanel Width="Auto"   >
+                        <toolkit:DockPanel   Background="{x:Null}" toolkit:DockPanel.Dock="Bottom" Margin="0,0,0,5" Height="22">
+                            <TextBlock TextWrapping="Wrap" Text="{m:Exp Str=$共\{areafiles.ItemsSource.Count\}项}" Width="Auto" HorizontalAlignment="Right" Foreground="#FF140000" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
+                            <sdk:DataPager x:Name="pager2" Source="{Binding ItemsSource.Count, Converter={StaticResource DataPagerConverter}, ElementName=areafiles}"  Margin="0,0,0,-2" PageSize="20"/>
+                        </toolkit:DockPanel>
+                        <toolkit:DockPanel  x:Name="areafilesearch2" toolkit:DockPanel.Dock="Top"  Margin="0,0,0,5" Background="#FFEAF8FF"  >
+                            <a:Data.Context>
+                                <o:SearchObject />
+                            </a:Data.Context>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="70"/>
+                                    <ColumnDefinition Width="50*"/>
+                                    <ColumnDefinition Width="50*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock TextWrapping="Wrap" Text="小区名称：" Margin="5,4,0,4" />
+                                <TextBox TextWrapping="Wrap" Grid.Column="1" Text="{m:Bind Path=f_districtname}" Width="Auto" Margin="0" Height="25" >
+                                    <a:Data.Prop>
+                                        <o:PropertySetter PropertyName="f_districtname"  Operator="f_districtname like '%this%'"/>
+                                    </a:Data.Prop>
+                                </TextBox>
+                                <TextBlock TextWrapping="Wrap" Grid.Row="1" Text="小区地址：" Margin="5,4,0,4" />
+                                <TextBox TextWrapping="Wrap" Grid.Row="1" Grid.Column="1" Text="{m:Bind Path=f_address}" Width="Auto" Margin="0" Height="25" >
+                                    <a:Data.Prop>
+                                        <o:PropertySetter PropertyName="f_address"  Operator="f_address like '%this%'"/>
+                                    </a:Data.Prop>
+                                </TextBox>
+                                <Button Content="查  询" x:Name="areasearchbutton2" Grid.Column="2" Grid.Row="1" Click="{m:Exp Str=areafilesearch.DataContext.Search()}" Margin="0,0,5,-2" HorizontalAlignment="Right" d:LayoutOverrides="Height" Width="50"/>
+                            </Grid>
+                        </toolkit:DockPanel>
+                        <sdk:DataGrid x:Name="areafiles2" Margin="0" ItemsSource="{m:Exp Str=areafileslist}"
+							AutoGenerateColumns="False" Width="Auto" Background="{x:Null}" IsReadOnly="True"
+							>
+                            <sdk:DataGrid.Columns>
+                                <sdk:DataGridTextColumn d:IsLocked="True" Header="序号" Binding="{Binding Index}"/>
+                                <sdk:DataGridTextColumn Header="小区名称" Binding="{Binding f_districtname}"/>
+                                <sdk:DataGridTextColumn Header="小区地址" Binding="{Binding f_address}"/>
+                                <sdk:DataGridTextColumn Header="用气性质" Binding="{Binding f_gasproperties}"/>
+                            </sdk:DataGrid.Columns>
+                        </sdk:DataGrid>
+                    </toolkit:DockPanel>
+					</sdk:TabItem>
+                </sdk:TabControl>
             </c:BusyIndicatorEx>
             <c:BusyIndicatorEx BusyContent="正在工作，请稍等" IsBusy="{m:Exp Str=userfile.DataContext.IsBusy or SaveAction.IsBusy}" Margin="5,0,0,0" Grid.Column="1" >
                 <toolkit:DockPanel>
