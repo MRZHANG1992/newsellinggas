@@ -105,8 +105,8 @@ namespace Com.Aote.Pages
                 ui_stardate.Text = items["f_stardate"].ToString().Substring(1, 10);
                 ui_enddate.Text = items["f_enddate"].ToString().Substring(1, 10);
                 ui_grossproceeds.Text = items["f_totalcost"].ToString();
-                ui_preamount.Text = items["f_chargenum"].ToString();
-                ui_totalcost.Text = items["f_totalcost"].ToString();
+                ui_preamount.Text = Math.Round(double.Parse(items["f_chargenum"].ToString()), 2).ToString();
+                ui_totalcost.Text = Math.Round(double.Parse(items["f_totalcost"].ToString()), 2).ToString();
             }
             else
             {
