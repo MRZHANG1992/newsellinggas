@@ -20,7 +20,7 @@
         <m:ResourceLoad Margin="0,0,-12,0">
             <!--发卡费-->
             <o:GeneralObject Name="fakafei" EntityType="t_singlevalue" WebClientInfo="{StaticResource dbclient}" 
-		        IsInit="{m:Exp Str='print.State\=\=$End$ or zzprint.State==$End$'}" 
+		        IsInit="{m:Exp Str=print.State\=\=$End$ or zzprint.State\=\=$End$ or print.State\=\=$Cancle$ or zzprint.State\=\=$Cancle$}" 
 		  		Path="{m:Exp Str=$one/from t_singlevalue where name \= \'\{LoginUser.f_fengongsi\}\{userfiles.f_usertype\}\卡\费\'}"   >
             </o:GeneralObject>
 
@@ -38,7 +38,7 @@
 
             <!--换表对象-->
             <o:GeneralObject Name="pipelinego" EntityType="t_changmeter" WebClientInfo="{StaticResource dbclient}" 
-		    IsInit="{m:Exp Str='print.State\=\=$End$ or zzprint.State==$End'}">
+		    IsInit="{m:Exp Str=print.State\=\=$End$ or zzprint.State\=\=$End$ or print.State\=\=$Cancle$ or zzprint.State\=\=$Cancle$}">
                 <o:PropertySetter PropertyName="f_zherownum" Value="{m:Exp Str=userfiles !\= null and userfiles.f_zherownum !\= null and userfiles.f_zherownum.ToInt()^24:userfiles.f_zherownum+1\,1}"/>
                 <o:PropertySetter PropertyName="f_state" Default="换表登记"></o:PropertySetter>
             </o:GeneralObject>
@@ -49,7 +49,7 @@
 			PageIndex="{m:Exp Str=pager.PageIndex}" PageSize="{m:Exp Str=pager.PageSize}" SumNames="f_times"/>
             <!--用户对象-->
             <o:GeneralObject Name="userfiles" NotEmpty="true" EntityType="t_userfiles" WebClientInfo="{StaticResource dbclient}"
-			IsInit="{m:Exp Str='print.State\=\=$End$ or zzprint.State==$End$'}"
+			IsInit="{m:Exp Str=print.State\=\=$End$ or zzprint.State\=\=$End$ or print.State\=\=$Cancle$ or zzprint.State\=\=$Cancle$}"
             Path="{m:Exp Str=
 			card.CardId\=>ReadCompleted!\=null and card.Factory!\=null:$one/from t_userfiles where f_cardid\=\'\{card.CardId\}\' and f_aliasname\=\'\{card.Factory\}\' and f_filiale\=\'\{LoginUser.f_fengongsi\}\'$\,pipelines.SelectedItem.f_userid\=>SelectionChanged\!\=null:$one/from t_userfiles where f_userid\=\'\{pipelines.SelectedItem.f_userid\}\' and f_filiale\=\'\{LoginUser.f_fengongsi\}\'$\,$null$}">
                 <!--换表回写-->

@@ -39,7 +39,7 @@
         </o:GeneralObject>
 			
 			</m:ResourceLoad>
-		<toolkit:BusyIndicator  BusyContent="正在查询，请稍等" IsBusy="{m:Exp Str=fpinfos.ItemsSource.IsBusy}">
+		<c:BusyIndicatorEx  BusyContent="正在查询，请稍等" IsBusy="{m:Exp Str=fpinfos.ItemsSource.IsBusy}">
 			<toolkit:DockPanel   >
 				<toolkit:DockPanel x:Name="fpinfossearch"  toolkit:DockPanel.Dock="Top" Margin="0,0,0,3" Background="#FFCFEFFF" >
 					<a:Data.Context>
@@ -155,8 +155,8 @@
 						</sdk:DataGrid.Columns>
 					</sdk:DataGrid>
 				</toolkit:DockPanel>
-			</toolkit:BusyIndicator>
-			<toolkit:BusyIndicator Grid.Column="1">
+			</c:BusyIndicatorEx>
+			<c:BusyIndicatorEx Grid.Column="1">
 				<Grid Background="{x:Null}" x:Name="fpinfo" >
 					<a:Data.Context>
 						<o:GeneralObject  Name="fpinfosgo" WebClientInfo="{StaticResource dbclient}" 
@@ -292,6 +292,6 @@
 						</TextBox>
 					</Grid>
 				</Grid>
-			</toolkit:BusyIndicator>
+			</c:BusyIndicatorEx>
 		</Grid>
 </UserControl>

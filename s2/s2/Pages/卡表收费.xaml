@@ -102,7 +102,7 @@
             <!--用户对象-->
             <o:GeneralObject Name="kbusers" EntityType="t_userfiles" WebClientInfo="{StaticResource dbclient}"
              Path="{m:Exp Str=card.CardId !\= null and card.Factory !\=null and card.Factory \=\=$jinka$ :$one/from t_userfiles where f_userstate !\=\'注销\' and f_cardid\=\'\{card.CardId\}\' and dqdm \= \'\{card.Dqdm\}\' and f_aliasname\=\'\{card.Factory\}\'$\,card.CardId !\= null and card.Factory !\=null:$one/from t_userfiles where f_cardid\=\'\{card.CardId\}\' and f_aliasname\=\'\{card.Factory\}\'$\,$null$}" 
-			 IsInit="{m:Exp Str=SaveAction\=\=$Error$ |or| print1.State\=\=$End$ |or| print.State\=\=$End$}">
+			 IsInit="{m:Exp Str=SaveAction\=\=$Error$ |or| print1.State\=\=$End$ |or| print.State\=\=$End$ |or| print1.State\=\=$Cancle$ |or| print.State\=\=$Cancle$}">
                 <!--折子号-->
                 <o:PropertySetter PropertyName="f_zherownum" 
 				NoDependValue="{m:Exp Str=SaveAction\=>Saving!\=null:kbfee.f_zherownum.ToInt()\,0}"></o:PropertySetter>
@@ -128,7 +128,7 @@
 
             <!--收费对象-->
             <o:GeneralObject Name="kbfee" EntityType="t_sellinggas" WebClientInfo="{StaticResource dbclient}"
-            IsInit="{m:Exp Str=SaveAction\=\=$Error$ |or| print1.State\=\=$End$ |or| print.State\=\=$End$}">
+            IsInit="{m:Exp Str=SaveAction\=\=$Error$ |or| print1.State\=\=$End$ |or| print.State\=\=$End$ |or| print1.State\=\=$Cancle$ |or| print.State\=\=$Cancle$}">
                 <o:PropertySetter PropertyName="f_zherownum" NoDependValue="{m:Exp Str=kbusers !\= null and kbusers.f_zherownum !\= null and kbusers.f_zherownum.ToInt()^24:kbusers.f_zherownum+1\,1}"/>
                 <o:PropertySetter PropertyName="f_pregas" NotNull="True"  
 					Validation="{m:Exp Str= value ^\= kbfee1.DataContext.f_limitbuygas}"  ErrorMessage="购买气量超出限购气量，不能购气！"
@@ -145,7 +145,7 @@
             <o:GeneralObject Name="fpinfosobj" EntityType="t_fapiaoinfos" WebClientInfo="{StaticResource dbclient}" 
          Path="{m:Exp Str=$one/from t_fapiaoinfos where f_invoicenum\=\'\{kbfee1.DataContext.f_invoicenum\}\'}" 
                              
-			IsInit="{m:Exp Str=SaveAction\=\=$Error$ |or| card.State\=\=$Error$ |or| print1.State\=\=$End$ |or| print.State\=\=$End$}">
+			IsInit="{m:Exp Str=SaveAction\=\=$Error$ |or| card.State\=\=$Error$ |or| print1.State\=\=$End$ |or| print.State\=\=$End$ |or| print1.State\=\=$Cancle$ |or| print.State\=\=$Cancle$}">
                 <o:PropertySetter PropertyName="f_username" Value="{m:Exp Str=kbfee1.DataContext.f_username}"/>
                 <o:PropertySetter PropertyName="f_invoicenum" Value="{m:Exp Str=kbfee1.DataContext.f_invoicenum}"/>
                 <o:PropertySetter PropertyName="f_userid" Value="{m:Exp Str=kbfee1.DataContext.f_userid}" />
@@ -162,12 +162,12 @@
 
             </o:GeneralObject>
             <!--重新获取发票号-->
-            <b:ScriptAction Name="loadfapiao" CanRun="{m:Exp Str=print.State\=\=$End$ |or| print1.State\=\=$End$  }" Start="{m:Exp Str=LoginUserfapiao.IsOld\=True}"></b:ScriptAction>
+            <b:ScriptAction Name="loadfapiao" CanRun="{m:Exp Str=print.State\=\=$End$ |or| print1.State\=\=$End$  |or| print1.State\=\=$Cancle$ |or| print.State\=\=$Cancle$ }" Start="{m:Exp Str=LoginUserfapiao.IsOld\=True}"></b:ScriptAction>
 
             <!--补气对象-->
             <o:GeneralObject  Name="fillgas" WebClientInfo="{StaticResource dbclient}" 
     		EntityType="t_fillgas" 
-    		IsInit="{m:Exp Str=SaveAction\=\=$Error$ |or| print1.State\=\=$End$ |or| print.State\=\=$End$}" >
+    		IsInit="{m:Exp Str=SaveAction\=\=$Error$ |or| print1.State\=\=$End$ |or| print.State\=\=$End$ |or| print1.State\=\=$Cancle$ |or| print.State\=\=$Cancle$}" >
                 <o:PropertySetter PropertyName="f_username" Value="{m:Exp Str=kbusers.f_username}" />
                 <o:PropertySetter PropertyName="f_usertype" Value="{m:Exp Str=kbusers.f_usertype}" />
                 <o:PropertySetter PropertyName="f_userid" Value="{m:Exp Str=kbusers.f_userid}"/>

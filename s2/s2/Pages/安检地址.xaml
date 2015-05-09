@@ -110,10 +110,11 @@
                 <toolkit:DockPanel Background="{x:Null}" x:Name="apply" >
                     <a:Data.Context>
                         <oo:GasADObject  Name="applygo" WebClientInfo="{StaticResource dbclient}" 
-						EntityType="t_gasaddress1" IsInit="{m:Exp Str=apply.DataContext.State\=\=$Loaded$}"
+						EntityType="t_gasaddress" IsInit="{m:Exp Str=apply.DataContext.State\=\=$Loaded$}"
 						>
                             <o:PropertySetter PropertyName="f_state" Default="未建档"/>
                             <o:PropertySetter PropertyName="f_road" Default="{m:Exp Str=openchild.Result.f_road}"/>
+							<o:PropertySetter PropertyName="f_address" Default="{m:Exp Str=openchild.Result.f_address}"/>
 
                         </oo:GasADObject>
                     </a:Data.Context>

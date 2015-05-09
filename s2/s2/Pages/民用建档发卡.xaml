@@ -67,14 +67,22 @@
             </o:GeneralObject>
             <!--用户ming-->
             <o:ObjectList Name="statelistnull" EntityType="paramvalue" HasEmptyRow="True" WebClientInfo="{StaticResource dbclient}"  Path="from paramvalue where param.name='用户状态查询用' order by id"/>
+           <!--楼号列表-->
+            <o:ObjectList Name="louhaolist" EntityType="t_gasaddress" HasEmptyRow="True" WebClientInfo="{StaticResource dbclient}"  Path="{m:Exp Str=$select new map(f_cusDom as f_cusDom) from t_gasaddress where f_districtname like \'%\{areafilesearch2.DataContext.f_districtname\}%\' group by f_cusdom}"/>
            
-
+			<o:GeneralObject Name="temp" EntityType="" Source="{m:Exp Str=TabControl.SelectedIndex\=\=0:areafiles.SelectedItem\,areafiles2.SelectedItem}"/>
             <!--小区列表-->
             <o:PagedObjectList Name="areafileslist" WebClientInfo="{StaticResource dbclient}"
 				Path="{m:Exp Str=$from t_area where \{areafilesearch.DataContext.Condition\}}"
 				IsOld="{m:Exp Str=SaveAction.State\=\=$End$ or SaveFaKaAction.State\=\=$End$}"
 				SumNames=","
 				PageSize="{m:Exp Str=pager.PageSize}" PageIndex="{m:Exp Str=pager.PageIndex}"/>
+				<!--地址列表-->
+            <o:PagedObjectList Name="areafileslist2" WebClientInfo="{StaticResource dbclient}"
+				Path="{m:Exp Str=$from t_gasaddress where \{areafilesearch2.DataContext.Condition\}}"
+				IsOld="{m:Exp Str=SaveAction.State\=\=$End$ or SaveFaKaAction.State\=\=$End$}"
+				SumNames=","
+				PageSize="{m:Exp Str=pager2.PageSize}" PageIndex="{m:Exp Str=pager2.PageIndex}"/>
             <!--小区对象areas.f_usernumber-->
             <o:GeneralObject Name="areas" EntityType="t_area" WebClientInfo="{StaticResource dbclient}"
                   Path="{m:Exp Str=$one/from t_area where id\=\'\{areafiles.SelectedItem.id\}\'}" 
@@ -82,7 +90,7 @@
             <o:ObjectList Name="zhengjianlist" WebClientInfo="{StaticResource dbclient}" Path="from paramvalue where param.name='证件类型'"/>
             <!--更新用气地址表已建档案-->
             <b:HQLAction Name="updategasad"  WebClientInfo="{StaticResource dbclient}" 
-				HQL="{m:Exp Str=$update t_gasaddress set f_state\=\'已建档\' where id in (\{areafiles.SelectedItems.ToString(id)\=>SelectionChanged\})}"/>
+				HQL="{m:Exp Str=TabControl.SelectedIndex\=\=1:$update t_gasaddress set f_state\=\'已建档\' where id \= \{areafiles2.SelectedItem.ID\}$\,null}"/>
 
             <!--单值用户编号对象ksnumobj.value-->
             <o:GeneralObject Name="ksnumobj" EntityType="t_singlevalue" WebClientInfo="{StaticResource dbclient}" 
@@ -97,6 +105,8 @@
             <b:SyncActionFactory Name="SaveAction"   >
                 <!--获取编号-->
                 <b:CallMethodAction    Name="getbianhao" TargetObject="{m:Exp Str=ksnumobj1}"    MethodName="Load"/>
+                <!--更新地址表-->
+                <b:CallMethodAction    Name="updategasaddress" CanSave="{m:Exp Str=TabControl.SelectedIndex\=\=1}" TargetObject="{m:Exp Str=updategasad}"    MethodName="Invoke"/>
                 <!--保存数据-->
                 <b:CallMethodAction    Name="saveu" TargetObject="{m:Exp Str=userfile.DataContext}"    MethodName="Save"/>
             </b:SyncActionFactory>
@@ -105,6 +115,8 @@
 			<b:SyncActionFactory Name="SaveFaKaAction"   >
                 <!--获取编号-->
                 <b:CallMethodAction TargetObject="{m:Exp Str=ksnumobj1}"    MethodName="Load"/>
+                <!--更新地址表-->
+                <b:CallMethodAction    Name="updategasaddress2" CanSave="{m:Exp Str=TabControl.SelectedIndex\=\=1}" TargetObject="{m:Exp Str=updategasad}"    MethodName="Invoke"/>
                 <!--保存数据-->
                 <b:CallMethodAction TargetObject="{m:Exp Str=userfile.DataContext}"    MethodName="Save"/>
             	<!--弹出发卡界面-->
@@ -116,9 +128,10 @@
                 <ColumnDefinition Width="0.25*"/>
                 <ColumnDefinition Width="0.75*"/>
             </Grid.ColumnDefinitions>
-            <c:BusyIndicatorEx BusyContent="正在查询，请稍等" IsBusy="{m:Exp Str=areafiles.ItemsSource.IsBusy}" >
-                <Border BorderThickness="1" BorderBrush="#FF9AA2AB" Margin="0" Padding="2" Width="Auto" Height="Auto" VerticalAlignment="Stretch" >
-                    <toolkit:DockPanel Width="Auto"   >
+            <c:BusyIndicatorEx BusyContent="正在查询，请稍等" IsBusy="{m:Exp Str=areafiles.ItemsSource.IsBusy or areafiles2.ItemsSource.IsBusy}" >
+                <sdk:TabControl Name="TabControl" BorderThickness="1"  BorderBrush="#FF9AA2AB" Margin="0" Padding="2" Width="Auto" Height="Auto" VerticalAlignment="Stretch" >
+                    <sdk:TabItem Header="小区建档">
+                    	<toolkit:DockPanel Width="Auto"   >
                         <toolkit:DockPanel   Background="{x:Null}" toolkit:DockPanel.Dock="Bottom" Margin="0,0,0,5" Height="22">
                             <TextBlock TextWrapping="Wrap" Text="{m:Exp Str=$共\{areafiles.ItemsSource.Count\}项}" Width="Auto" HorizontalAlignment="Right" Foreground="#FF140000" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
                             <sdk:DataPager x:Name="pager" Source="{Binding ItemsSource.Count, Converter={StaticResource DataPagerConverter}, ElementName=areafiles}"  Margin="0,0,0,-2" PageSize="20"/>
@@ -162,9 +175,60 @@
                                 <sdk:DataGridTextColumn Header="用气性质" Binding="{Binding f_gasproperties}"/>
                             </sdk:DataGrid.Columns>
                         </sdk:DataGrid>
-
                     </toolkit:DockPanel>
-                </Border>
+					</sdk:TabItem>
+					 <sdk:TabItem Header="地址建档" >
+                    	<toolkit:DockPanel Width="Auto"   >
+                        <toolkit:DockPanel   Background="{x:Null}" toolkit:DockPanel.Dock="Bottom" Margin="0,0,0,5" Height="22">
+                            <TextBlock TextWrapping="Wrap" Text="{m:Exp Str=$共\{areafiles2.ItemsSource.Count\}项}" Width="Auto" HorizontalAlignment="Right" Foreground="#FF140000" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
+                            <sdk:DataPager x:Name="pager2" Source="{Binding ItemsSource.Count, Converter={StaticResource DataPagerConverter}, ElementName=areafiles2}"  Margin="0,0,0,-2" PageSize="20"/>
+                        </toolkit:DockPanel>
+                        <toolkit:DockPanel  x:Name="areafilesearch2" toolkit:DockPanel.Dock="Top"  Margin="0,0,0,5" Background="#FFEAF8FF"  >
+                            <a:Data.Context>
+                                <o:SearchObject />
+                            </a:Data.Context>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="70"/>
+                                    <ColumnDefinition Width="50*"/>
+                                    <ColumnDefinition Width="50*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock TextWrapping="Wrap" Text="小区名称：" Margin="5,4,0,4" />
+                                <TextBox TextWrapping="Wrap" Grid.Column="1" Text="{m:Bind Path=f_districtname}" Width="Auto" Margin="0" Height="25" >
+                                    <a:Data.Prop>
+                                        <o:PropertySetter PropertyName="f_districtname"  Operator="f_districtname like '%this%'"/>
+                                    </a:Data.Prop>
+                                </TextBox>
+                                <TextBlock TextWrapping="Wrap" Grid.Row="1" Text="楼号：" Margin="5,4,0,4" />
+								 <ComboBox x:Name="CoboxGasPro2" DisplayMemberPath="f_cusDom"  SelectedValuePath="f_cusDom" ItemsSource="{m:Exp Str=louhaolist}" SelectedValue="{m:Bind Path=f_cusDom}"  Grid.Column="1"  Grid.Row="1" Height="25" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Width="Auto" >
+                                            <a:Data.Prop>
+                                                <o:PropertySetter PropertyName="f_cusDom" Operator="f_cusDom='this'" />
+                                            </a:Data.Prop>
+                                        </ComboBox>
+                                <Button Content="查  询" x:Name="areasearchbutton2" Grid.Column="2" Grid.Row="1" Click="{m:Exp Str=areafilesearch2.DataContext.Search()}" Margin="0,0,5,-2" HorizontalAlignment="Right" d:LayoutOverrides="Height" Width="50"/>
+                            </Grid>
+                        </toolkit:DockPanel>
+                        <sdk:DataGrid x:Name="areafiles2" Margin="0" ItemsSource="{m:Exp Str=areafileslist2}"
+							AutoGenerateColumns="False" Width="Auto" Background="{x:Null}" IsReadOnly="True"
+							>
+                            <sdk:DataGrid.Columns>
+                            <sdk:DataGridTextColumn d:IsLocked="True" Header="序号" Binding="{Binding Index}"/>
+                            <sdk:DataGridTextColumn Header="街  道" Binding="{Binding f_road}"/>
+                            <sdk:DataGridTextColumn Header="小  区" Binding="{Binding f_districtname}"/>
+                            <sdk:DataGridTextColumn Header="建档状态" Binding="{Binding f_state}"/>
+                            <sdk:DataGridTextColumn Header="楼  号" Binding="{Binding f_cusDom}"/>
+                            <sdk:DataGridTextColumn Header="单  元" Binding="{Binding f_cusDy}"/>
+                            <sdk:DataGridTextColumn Header="楼  层" Binding="{Binding f_cusFloor}"/>
+                            <sdk:DataGridTextColumn Header="房  号" Binding="{Binding f_apartment}"/>
+                            </sdk:DataGrid.Columns>
+                        </sdk:DataGrid>
+                    </toolkit:DockPanel>
+					</sdk:TabItem>
+                </sdk:TabControl>
             </c:BusyIndicatorEx>
             <c:BusyIndicatorEx BusyContent="正在工作，请稍等" IsBusy="{m:Exp Str=userfile.DataContext.IsBusy or SaveAction.IsBusy or SaveFaKaAction.IsBusy}" Margin="5,0,0,0" Grid.Column="1" >
                 <toolkit:DockPanel>
@@ -176,7 +240,7 @@
                         <Button x:Name="savefk" Content="保存并发卡" Margin="5" 
 							IsEnabled="{m:Exp Str=!userfilego.HasErrors }" 
 							Click="{m:Exp Str=SaveFaKaAction.Invoke()}" Width="82" />
-						<Button x:Name="cancel" Content="撤  销" Margin="5" Click="{m:Exp Str=userfile.DataContext.New();areafiles.SelectedItem\=null}" Width="50"/>
+						<Button x:Name="cancel" Content="撤  销" Margin="5" Click="{m:Exp Str=userfile.DataContext.New()}" Width="50"/>
                     </toolkit:DockPanel>
                     <Grid x:Name="userfile" DataContext="{m:Exp Str=userfilego}" Margin="0,0,0,20" >
                         <!--非民用主操作区-->
@@ -267,7 +331,7 @@
 									</sdk:AutoCompleteBox-->
                                         <TextBox Text="{m:Bind Path=f_districtname}" x:Name="f_districtname" LostFocus="{m:Exp Str=areas.Load()}" Grid.Column="3" Margin="0,2,0,3" Grid.Row="1"  Grid.ColumnSpan="1"  TextWrapping="Wrap" Height="25" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Width="Auto" Grid.RowSpan="1" >
                                             <a:Data.Prop>
-                                                <o:PropertySetter PropertyName="f_districtname" Value="{m:Exp Str=areafiles.SelectedItem.f_districtname}"  Default="{m:Exp Str=userfilego.f_districtname}"/>
+                                                <o:PropertySetter PropertyName="f_districtname" Value="{m:Exp Str=temp.f_districtname}"  Default="{m:Exp Str=userfilego.f_districtname}"/>
                                             </a:Data.Prop>
                                         </TextBox>
 
@@ -285,7 +349,7 @@
                                         </ComboBox>
                                         <TextBox Text="{m:Bind Path=f_apartment}" x:Name="f_apartment"  Grid.Column="5" Margin="1,3,0,2" Grid.Row="3" TextWrapping="Wrap" IsReadOnly="False" Height="25" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Width="Auto" Grid.RowSpan="1" Grid.ColumnSpan="1"  >
                                             <a:Data.Prop>
-                                                <o:PropertySetter PropertyName="f_apartment" Value="{m:Exp Str=userfilego.f_apartment\=>Completed}"  NotNull="True"/>
+                                                <o:PropertySetter PropertyName="f_apartment" Value="{m:Exp Str=temp.f_apartment}"  NotNull="True"/>
                                             </a:Data.Prop>
                                         </TextBox>
 
@@ -296,7 +360,7 @@
                                         </TextBox>
                                         <ComboBox x:Name="CoboxGasPro" DisplayMemberPath="f_gasproperties"  SelectedValuePath="f_gasproperties" ItemsSource="{m:Exp Str=usegaslist}" SelectedValue="{m:Bind Path=f_gasproperties}"  Grid.Column="1" Margin="0,3,0,2" Grid.Row="9" Height="25" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Width="Auto" >
                                             <a:Data.Prop>
-                                                <o:PropertySetter PropertyName="f_gasproperties" NotNull="True" Value="{m:Exp Str=$\{areafiles.SelectedItem.f_gasproperties\}$}"  Default="{m:Exp Str=userfilego.f_gasproperties}"/>
+                                                <o:PropertySetter PropertyName="f_gasproperties" NotNull="True" Value="{m:Exp Str=$\{areafiles.SelectedItem.f_gasproperties\}$}" Default="{m:Exp Str='usegaslist.Count > 0 :usegaslist.First().f_gasproperties,null'}" />
                                             </a:Data.Prop>
                                         </ComboBox>
                                         <ComboBox x:Name="CoboxGas" DisplayMemberPath="f_gaspricetype" SelectedValuePath="f_gaspricetype" ItemsSource="{m:Exp Str=CoboxGasPro.SelectedItem.pricetype}" SelectedValue="{m:Bind Path=f_gaspricetype}"  Grid.Column="3" Margin="0,3,0,2" Grid.Row="9" Height="25" VerticalAlignment="Stretch" Grid.ColumnSpan="1" >
@@ -526,7 +590,7 @@
                                         </TextBox>
                                         <TextBox Text="{m:Bind Path=f_areaaddress}" x:Name="f_areaaddress" LostFocus="{m:Exp Str=areas.Load()}"  Grid.Column="5" Margin="0,3,0,2" Grid.Row="1" TextWrapping="Wrap" Height="25" VerticalAlignment="Stretch" IsReadOnly="False" Grid.ColumnSpan="2" Grid.RowSpan="1" >
                                             <a:Data.Prop>
-                                                <o:PropertySetter PropertyName="f_areaaddress" Value="{m:Exp Str=$\{areafiles.SelectedItem.f_address\}$}" Default="{m:Exp Str=userfilego.f_areaaddress}"/>
+                                                <o:PropertySetter PropertyName="f_areaaddress" Value="{m:Exp Str=temp.f_address}" Default="{m:Exp Str=userfilego.f_areaaddress}"/>
                                             </a:Data.Prop>
                                         </TextBox>
                                         <TextBox x:Name="CoboxPin_Copy" IsReadOnly="True"  Text="{m:Bind Path=f_userstate}" Grid.Column="5" Margin="0,1,0,0" Grid.Row="5" Height="25">
@@ -542,13 +606,13 @@
                                         </TextBox>
                                         <TextBox Text="{m:Bind Path=f_cusDom}" x:Name="f_cusDom" Grid.Column="1" Margin="1,3,0,2" Grid.Row="3"  Grid.ColumnSpan="1"  TextWrapping="Wrap" Height="25" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Width="Auto" Grid.RowSpan="1">
                                             <a:Data.Prop>
-                                                <o:PropertySetter PropertyName="f_cusDom" NotNull="True" Value="{m:Exp Str=userfilego.f_cusDom\=>Completed}"/>
+                                                <o:PropertySetter PropertyName="f_cusDom" NotNull="True" Value="{m:Exp Str=temp.f_cusDom}"/>
                                             </a:Data.Prop>
                                         </TextBox>
                                         <TextBlock Text="单        元：" Margin="2,2,0,3" Grid.Row="3" TextWrapping="Wrap" TextAlignment="Right" Height="25" Grid.Column="2"/>
                                         <TextBox Text="{m:Bind Path=f_cusDy}" x:Name="f_cusDy" Grid.Column="3" Margin="1,3,0,2" Grid.Row="3" TextWrapping="Wrap" Grid.ColumnSpan="1" Height="25" VerticalAlignment="Stretch" Grid.RowSpan="1" >
                                             <a:Data.Prop>
-                                                <o:PropertySetter PropertyName="f_cusDy"  Value="{m:Exp Str=userfilego.f_cusDy\=&gt;Completed}"  NotNull="True"/>
+                                                <o:PropertySetter PropertyName="f_cusDy"  Value="{m:Exp Str=temp.f_cusDy}"  NotNull="True"/>
                                             </a:Data.Prop>
                                             <!-- Value="{m:Exp Str=$\{userfilego.f_districtname\}\{userfilego.f_address\}$}"/-->
                                         </TextBox>
