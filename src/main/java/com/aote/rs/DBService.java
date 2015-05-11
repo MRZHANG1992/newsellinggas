@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.sql.Blob;
 import java.text.SimpleDateFormat;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.management.modelmbean.XMLParseException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
@@ -47,10 +49,13 @@ import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
 import org.dom4j.io.OutputFormat;
 import org.dom4j.io.XMLWriter;
+import org.hibernate.FlushMode;
 import org.hibernate.Hibernate;
 import org.hibernate.HibernateException;
 import org.hibernate.Query;
 import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 import org.hibernate.collection.PersistentSet;
 import org.hibernate.engine.SessionFactoryImplementor;
 import org.hibernate.metadata.ClassMetadata;
@@ -69,26 +74,32 @@ import org.springframework.orm.hibernate3.HibernateCallback;
 import org.springframework.orm.hibernate3.HibernateTemplate;
 import org.springframework.stereotype.Component;
 
+import sun.misc.BASE64Encoder;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import com.aote.expression.ExpressionGenerator;
 
+/**
+ * 命名规则： query,get开头的是只读事务 tx开始的是读写事务 xt开头的是手动控制事务
+ * 
+ * @author grain
+ *
+ */
 @Path("db")
 @Component
 public class DBService {
 	static Logger log = Logger.getLogger(DBService.class);
 
 	@Autowired
-	private HibernateTemplate hibernateTemplate;
+	private SessionFactory sessionFactory;
 
 	// 获取各种实体的属性信息
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public JSONObject metas() {
+	public JSONObject getMetas() {
 		JSONObject result = new JSONObject();
 		// 获取所有实体
-		Map<String, ClassMetadata> map = this.hibernateTemplate
-				.getSessionFactory().getAllClassMetadata();
+		Map<String, ClassMetadata> map = sessionFactory.getAllClassMetadata();
 		for (Map.Entry<String, ClassMetadata> entry : map.entrySet()) {
 			try {
 				String key = entry.getKey();
@@ -125,8 +136,7 @@ public class DBService {
 
 	// 得到集合类型的关联实体类型
 	private String getCollectionEntityName(SetType type) {
-		SessionFactoryImplementor sf = (SessionFactoryImplementor) this.hibernateTemplate
-				.getSessionFactory();
+		SessionFactoryImplementor sf = (SessionFactoryImplementor) sessionFactory;
 		String entityName = type.getAssociatedEntityName(sf);
 		return entityName;
 	}
@@ -135,44 +145,54 @@ public class DBService {
 	@Path("{hql}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public JSONArray query(@PathParam("hql") String query) {
+		return xtArray(sessionFactory.getCurrentSession(), query);
+	}
+
+	private JSONArray xtArray(Session session, String query) {
 		// %在路径中不能出现，把%改成了^
 		// query = query.replaceAll("0x25", "%");
 		// sql中有除号的时候替换
 		query = query.replace("|", "/");
 		log.debug(query);
 		JSONArray array = new JSONArray();
-		//List<Object> list = this.hibernateTemplate.find(query);
-		//单次查询加记录数限制
-		List list = this.hibernateTemplate.executeFind(new HibernateCall(query,0, 10000));
+		// List<Object> list = this.hibernateTemplate.find(query);
+		// 单次查询加记录数限制
+		List list = executeFind(session, new HibernateCall(query, 0, 10000));
 		for (Object obj : list) {
 			// 把单个map转换成JSON对象
 			Map<String, Object> map = (Map<String, Object>) obj;
-			JSONObject json =  (JSONObject) new JsonTransfer().MapToJson(map);
+			JSONObject json = (JSONObject) new JsonTransfer().MapToJson(map);
 			array.put(json);
 		}
 		log.debug(array.toString());
 		return array;
+
+	}
+
+	private List executeFind(Session session, HibernateCall hibernateCall) {
+		return (List) hibernateCall.doInHibernate(session);
 	}
 
 	@GET
 	@Path("/agg/{hql}/{attrname}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public JSONArray query(@PathParam("hql") String query, @PathParam("attrname") String names) {
+	public JSONArray query(@PathParam("hql") String query,
+			@PathParam("attrname") String names) {
 		// sql中有除号的时候替换
 		query = query.replace("|", "/");
 		log.debug(query);
 		JSONArray array = new JSONArray();
-		//List<Object> list = this.hibernateTemplate.find(query);
-		//单次查询加记录数限制
-		List list = this.hibernateTemplate.executeFind(new HibernateCall(query,0, 10000));
+		// List<Object> list = this.hibernateTemplate.find(query);
+		// 单次查询加记录数限制
+		List list = executeFind(sessionFactory.getCurrentSession(),
+				new HibernateCall(query, 0, 10000));
 		for (Object obj : list) {
-			//属性名为每一个计算项对应的名称
+			// 属性名为每一个计算项对应的名称
 			String[] snames = names.split(",");
-			//select多项时，后面的各项为第一项对象的计算属性
-			Object[] objs = (Object[])obj;
+			// select多项时，后面的各项为第一项对象的计算属性
+			Object[] objs = (Object[]) obj;
 			Map<String, Object> map = (Map<String, Object>) objs[0];
-			for(int i = 1; i < objs.length; i++)
-			{
+			for (int i = 1; i < objs.length; i++) {
 				map.put(snames[i - 1], objs[i]);
 			}
 			JSONObject json = (JSONObject) new JsonTransfer().MapToJson(map);
@@ -190,16 +210,17 @@ public class DBService {
 		// query = query.replaceAll("\\^", "%");
 		log.debug(query);
 		JSONObject result = new JSONObject();
-		//List<Object> list = this.hibernateTemplate.find(query);
-		//单次查询加记录数限制
-		List list = this.hibernateTemplate.executeFind(new HibernateCall(query,0, 10000));
+		// List<Object> list = this.hibernateTemplate.find(query);
+		// 单次查询加记录数限制
+		List list = executeFind(sessionFactory.getCurrentSession(),
+				new HibernateCall(query, 0, 10000));
 		if (list.size() != 1) {
 			// 查询到多条数据，跑出异常
 			throw new WebApplicationException(500);
 		}
 		// 把单个map转换成JSON对象
 		Map<String, Object> map = (Map<String, Object>) list.get(0);
-		result =  (JSONObject) new JsonTransfer().MapToJson(map);
+		result = (JSONObject) new JsonTransfer().MapToJson(map);
 		log.debug(result.toString());
 		return result;
 	}
@@ -211,18 +232,19 @@ public class DBService {
 			@PathParam("attrname") String attrname) {
 		log.debug(query);
 		JSONObject result = new JSONObject();
-		//单次查询加记录数限制
-		List list = this.hibernateTemplate.executeFind(new HibernateCall(query,0, 10000));
-    	if (list.size() != 1) {
+		// 单次查询加记录数限制
+		List list = executeFind(sessionFactory.getCurrentSession(),
+				new HibernateCall(query, 0, 10000));
+		if (list.size() != 1) {
 			// 查询到多条数据，跑出异常
 			throw new WebApplicationException(500);
 		}
 		// 把单个map转换成JSON对象
 		Map<String, Object> map = (Map<String, Object>) list.get(0);
-		result =  (JSONObject) new JsonTransfer().MapToJson(map);
+		result = (JSONObject) new JsonTransfer().MapToJson(map);
 		long attrVal = Long.parseLong(map.get(attrname).toString());
 		map.put(attrname, attrVal + 1 + "");
-		this.hibernateTemplate.update(map);
+		sessionFactory.getCurrentSession().update(map);
 		log.debug(result.toString());
 		return result;
 	}
@@ -235,8 +257,8 @@ public class DBService {
 			@PathParam("pageSize") int pageSize,
 			@PathParam("pageIndex") int pageIndex) {
 		JSONArray array = new JSONArray();
-		List list = this.hibernateTemplate.executeFind(new HibernateCall(query,
-				pageIndex, pageSize));
+		List list = executeFind(sessionFactory.getCurrentSession(),
+				new HibernateCall(query, pageIndex, pageSize));
 		for (Object obj : list) {
 			// 把单个map转换成JSON对象
 			Map<String, Object> map = (Map<String, Object>) obj;
@@ -267,56 +289,27 @@ public class DBService {
 	}
 
 	/**
-	// 把单个map转换成JSON对象
-	private JSONObject MapToJson(Map<String, Object> map) {
-		JSONObject json = new JSONObject();
-		for (Map.Entry<String, Object> entry : map.entrySet()) {
-			try {
-				String key = entry.getKey();
-				Object value = entry.getValue();
-				// 空值转换成JSON的空对象
-				if (value == null) {
-					value = JSONObject.NULL;
-				} else if (value instanceof PersistentSet) {
-					PersistentSet set = (PersistentSet) value;
-					value = ToJson(set);
-				}
-				// 如果是$type$，表示实体类型，转换成EntityType
-				if (key.equals("$type$")) {
-					json.put("EntityType", value);
-				} else if (value instanceof Date) {
-					Date d1 = (Date) value;
-					Calendar c = Calendar.getInstance();
-					long time = d1.getTime() + c.get(Calendar.ZONE_OFFSET);
-					json.put(key, time);
-				} else if (value instanceof HashMap) {
-					JSONObject json1 = MapToJson((Map<String, Object>) value);
-					json.put(key, json1);
-				} else {
-					json.put(key, value);
-				}
-			} catch (JSONException e) {
-				throw new WebApplicationException(400);
-			}
-		}
-		return json;
-	}
-
-	// 把集合转换成Json数组
-	private Object ToJson(PersistentSet set) {
-		// 没加载的集合当做空
-		if (!set.wasInitialized()) {
-			return JSONObject.NULL;
-		}
-		JSONArray array = new JSONArray();
-		for (Object obj : set) {
-			Map<String, Object> map = (Map<String, Object>) obj;
-			JSONObject json = MapToJson(map);
-			array.put(json);
-		}
-		return array;
-	}
-	**/
+	 * // 把单个map转换成JSON对象 private JSONObject MapToJson(Map<String, Object> map)
+	 * { JSONObject json = new JSONObject(); for (Map.Entry<String, Object>
+	 * entry : map.entrySet()) { try { String key = entry.getKey(); Object value
+	 * = entry.getValue(); // 空值转换成JSON的空对象 if (value == null) { value =
+	 * JSONObject.NULL; } else if (value instanceof PersistentSet) {
+	 * PersistentSet set = (PersistentSet) value; value = ToJson(set); } //
+	 * 如果是$type$，表示实体类型，转换成EntityType if (key.equals("$type$")) {
+	 * json.put("EntityType", value); } else if (value instanceof Date) { Date
+	 * d1 = (Date) value; Calendar c = Calendar.getInstance(); long time =
+	 * d1.getTime() + c.get(Calendar.ZONE_OFFSET); json.put(key, time); } else
+	 * if (value instanceof HashMap) { JSONObject json1 = MapToJson((Map<String,
+	 * Object>) value); json.put(key, json1); } else { json.put(key, value); } }
+	 * catch (JSONException e) { throw new WebApplicationException(400); } }
+	 * return json; }
+	 * 
+	 * // 把集合转换成Json数组 private Object ToJson(PersistentSet set) { // 没加载的集合当做空
+	 * if (!set.wasInitialized()) { return JSONObject.NULL; } JSONArray array =
+	 * new JSONArray(); for (Object obj : set) { Map<String, Object> map =
+	 * (Map<String, Object>) obj; JSONObject json = MapToJson(map);
+	 * array.put(json); } return array; }
+	 **/
 
 	@GET
 	@Path("{hql}/{sumNames}")
@@ -339,7 +332,7 @@ public class DBService {
 			hql = "select new map(count(*) as Count) " + query;
 		}
 		// hql = "select new map(count(*) as Count, " + sums + ") " + query;
-		List<Object> l = this.hibernateTemplate.find(hql);
+		List<Object> l = sessionFactory.getCurrentSession().find(hql);
 		// 把map转换成json对象
 		Map<String, Object> map = (Map<String, Object>) l.get(0);
 		for (Map.Entry<String, Object> entry : map.entrySet()) {
@@ -356,13 +349,14 @@ public class DBService {
 	@Path("sql/{sql}")
 	@Produces(MediaType.APPLICATION_JSON)
 	// 获取一页数据
-	public JSONArray sqlQuery(@PathParam("sql") String query) {
+	public JSONArray querySQL(@PathParam("sql") String query) {
 		JSONArray array = new JSONArray();
 		// sql中有除号的时候替换
 		query = query.replace("|", "/");
 		final String sql = query;
 		HibernateSQLCall sqlCall = new HibernateSQLCall(query, 0, 10000);
-		List<Map<String, Object>> list = this.hibernateTemplate.executeFind(sqlCall);
+		List<Map<String, Object>> list = executeFind(
+				sessionFactory.getCurrentSession(), sqlCall);
 		for (Object obj : list) {
 			// 把单个map转换成JSON对象
 			Object[] c = (Object[]) obj;
@@ -379,19 +373,27 @@ public class DBService {
 		return array;
 	}
 
+	private List<Map<String, Object>> executeFind(Session session,
+			HibernateSQLCall sqlCall) {
+		return (List<Map<String, Object>>) sqlCall.doInHibernate(session);
+	}
+
 	/*
-	 * 执行一批对象操作，包括保存，删除，hql语句，hql批量对象语句, sql语句等。
-	 * 用json串表示。 json串格式为 [一批语句]， 语句格式为
-	 * {operator:'语句类型', entity:'实体类型', data:数据, name:前台配置的名字} 
-	 * 语句类型有 save 保存, delete 删除, hql 执行hql, hqlAll 对一批对象执行hql, sql 执行sql, reference 在主对象和从对象之间建立关联 
-	 * 实体类型 当执行hql语句或者sql语句的时候，为空。
-	 * 数据 保存时为一般json串，删除时为id号，执行hql时为hql语句，执行sql时为sql语句
-	 * 批量hql执行未作，设定的格式为 {hql:'hql语句'，ids:['id','id']}
+	 * 执行一批对象操作，包括保存，删除，hql语句，hql批量对象语句, sql语句等。 用json串表示。 json串格式为 [一批语句]，
+	 * 语句格式为 {operator:'语句类型', entity:'实体类型', data:数据, name:前台配置的名字} 语句类型有 save
+	 * 保存, delete 删除, hql 执行hql, hqlAll 对一批对象执行hql, sql 执行sql, reference
+	 * 在主对象和从对象之间建立关联 实体类型 当执行hql语句或者sql语句的时候，为空。 数据
+	 * 保存时为一般json串，删除时为id号，执行hql时为hql语句，执行sql时为sql语句 批量hql执行未作，设定的格式为
+	 * {hql:'hql语句'，ids:['id','id']}
 	 */
 	@POST
-	public JSONObject excute(String values) {
+	public JSONObject xtExecute(@Context HttpServletResponse response,
+			String values) {
 		log.debug(values);
+		// open a new session since we dont use spring here
+		Session session = sessionFactory.openSession();
 		try {
+			session.beginTransaction();
 			// 返回后台计算的结果,格式为 {对象名:{对象值}}
 			JSONObject result = new JSONObject();
 			// 一条条执行
@@ -402,98 +404,157 @@ public class DBService {
 				final String data = object.getString("data");
 				// 保存
 				if (oper.equals("save")) {
-					JSONObject obj = save(object.getString("entity"), object
-							.getJSONObject("data"));
+					JSONObject obj = save(session, object.getString("entity"),
+							object.getJSONObject("data"));
 					result.put(object.getString("name"), obj);
 				} else if (oper.equals("delete")) {
-					// 删除
-					delete(object.getString("entity"), object.getInt("data"));
+					String hql = "delete from " + object.getString("entity")
+							+ " where id=" + object.getInt("data");
+					log.debug(hql);
+					bulkUpdate(session, hql);
 				} else if (oper.equals("hql")) {
 					// 执行hql
-					this.hibernateTemplate.bulkUpdate(object.getString("data"));
+					bulkUpdate(session, object.getString("data"));
 				} else if (oper.equals("sql")) {
-					hibernateTemplate.execute(new HibernateCallback() {
-						public Object doInHibernate(Session session)
-								throws HibernateException {
-							return session.createSQLQuery(data).executeUpdate();
-						}
-					});
+					bulkSqlUpdate(session, data);
 				} else if (oper.equals("hqlAll")) {
 					// 执行批量hql
 					throw new NotImplementedException();
 				} else if (oper.equals("reference")) {
-					MasterDetailAssociationHandler(object);
+					MasterDetailAssociationHandler(session, object);
 				} else {
 					throw new WebApplicationException(500);
 				}
 			}
+			session.getTransaction().commit();
 			return result;
-		} catch (JSONException e) {
-			throw new WebApplicationException(500);
+		} catch (Exception e) {
+			session.getTransaction().rollback();
+			if (e instanceof org.hibernate.StaleObjectStateException) {
+				response.setHeader("Warning",
+						encode("目前的对象过于陈旧，因为它在其他地方已经被修改。"));
+				throw new WebApplicationException(501);
+			} else {
+				response.setHeader("Warning", encode(e.toString()));
+				throw new WebApplicationException(500);
+			}
+		} finally {
+			if (session != null)
+				session.close();
 		}
 	}
 
 	/**
-	 * 保存主对象得到ID
-	 * 根据sql/hql取得从对象集
-	 * 根据hibernate配置建立主从关联，并保存从对象
+	 * 返回updateCount
+	 * 
+	 * @param session
+	 * @param sql
+	 * @return
+	 */
+	private int bulkUpdate(Session session, String sql) {
+		Query queryObject = session.createQuery(sql);
+		return new Integer(queryObject.executeUpdate()).intValue();
+	}
+
+	/**
+	 * 返回updateCount
+	 * 
+	 * @param session
+	 * @param sql
+	 * @return
+	 */
+	private int bulkSqlUpdate(Session session, String sql) {
+		Query queryObject = session.createSQLQuery(sql);
+		return new Integer(queryObject.executeUpdate()).intValue();
+	}
+
+	private String encode(String error) {
+		try {
+			return (new BASE64Encoder()).encodeBuffer(error.getBytes("UTF-8"));
+		} catch (Exception e) {
+			return "";
+		}
+	}
+
+	/**
+	 * 保存主对象得到ID 根据sql/hql取得从对象集 根据hibernate配置建立主从关联，并保存从对象
+	 * 
 	 * @param object
 	 */
-	private void MasterDetailAssociationHandler(JSONObject object) throws JSONException{
+	private void MasterDetailAssociationHandler(Session session,
+			JSONObject object) throws Exception {
 		JSONObject row = object.getJSONObject("data");
 		String entity = object.getString("entity");
 		String entity2 = object.getString("entity2");
-		//先保存主对象，得到id
-		JSONObject obj = save(entity, row);
-		if(obj.has("ID"))
+		// 先保存主对象，得到id
+		JSONObject obj = save(session, entity, row);
+		if (obj.has("ID"))
 			row.put("ID", obj.get("ID"));
-		if(obj.has("id"))
+		if (obj.has("id"))
 			row.put("id", obj.get("id"));
-		//把从对象集赋给这个属性prop
-		String prop = object.getString("reference");	
-		//是sql还是hql
+		// 把从对象集赋给这个属性prop
+		String prop = object.getString("reference");
+		// 是sql还是hql
 		String type = object.getString("path");
-		//取出执行的语句
+		// 取出执行的语句
 		String hql = object.getString("hql");
-		if(type.equals("sql"))
-		{
-			//sql，根据列取回对象集
-			JSONArray array = this.postSQLPage(object.getString("names"), 9999999, 0, hql);
-			for(int i=0; i<array.length(); i++)
-			{
+		if (type.equals("sql")) {
+			JSONArray array = new JSONArray();
+			HibernateSQLCall sqlCall = new HibernateSQLCall(hql, 0, 9999999);
+			sqlCall.transformer = Transformers.ALIAS_TO_ENTITY_MAP;
+			List<Map<String, Object>> list = executeFind(session, sqlCall);
+			for (Map<String, Object> map : list) {
+				JSONObject json = (JSONObject) new JsonTransfer()
+						.MapToJson(map);
+				array.put(json);
+			}
+
+			for (int i = 0; i < array.length(); i++) {
 				array.getJSONObject(i).put("EntityType", entity2);
 			}
 			row.put(prop, array);
-		}
-		else if(type.equals("hql"))
-		{
-			row.put(prop, this.query(hql));
-		}
-		else
+		} else if (type.equals("hql")) {
+			row.put(prop, this.xtArray(session, hql));
+		} else
 			throw new WebApplicationException(500);
-		//更新主对象，建立关联
-		save(entity, row);
+		// 更新主对象，建立关联
+		save(session, entity, row);
 	}
 
 	@POST
 	@Path("{entity}")
-	public String save(@PathParam("entity") String entityName, String values) {
+	public String xtSave(@Context HttpServletResponse response,
+			@PathParam("entity") String entityName, String values)
+			throws Exception {
 		log.debug("entity:" + entityName + ", values:" + values);
+		Session session = sessionFactory.openSession();
+		session.beginTransaction();
 		try {
 			JSONObject object = new JSONObject(values);
-			save(entityName, object);
-		} catch (JSONException e) {
-			throw new WebApplicationException(500);
+			save(session, entityName, object);
+			session.getTransaction().commit();
+			return "ok";
+		} catch (Exception e) {
+			session.getTransaction().rollback();
+			if (e instanceof org.hibernate.StaleObjectStateException) {
+				response.setHeader("Warning",
+						encode("目前的对象过于陈旧，因为它在其他地方已经被修改。"));
+				throw new WebApplicationException(501);
+			} else {
+				response.setHeader("Warning", encode(e.toString()));
+				throw new WebApplicationException(500);
+			}
+		} finally {
+			if (session != null)
+				session.close();
 		}
-		return "ok";
 	}
 
 	// 内部保存过程，name为界面上传过来的要对象名字，返回的是后台表达式计算后的对象内容
-	private JSONObject save(String entityName, JSONObject object)
-			throws JSONException {
+	private JSONObject save(Session session, String entityName,
+			JSONObject object) throws Exception {
 		// 根据实体名字去除配置属性信息
-		ClassMetadata classData = this.hibernateTemplate.getSessionFactory()
-				.getClassMetadata(entityName);
+		ClassMetadata classData = sessionFactory.getClassMetadata(entityName);
 		JSONObject result = new JSONObject();
 		// 把json对象转换成map
 		Map<String, Object> map = new HashMap<String, Object>();
@@ -559,12 +620,11 @@ public class DBService {
 				map.put(key, value);
 			}
 		}
-		this.hibernateTemplate.saveOrUpdate(entityName, map);
-		if(map.containsKey("id"))
+		session.saveOrUpdate(entityName, map);
+		if (map.containsKey("id"))
 			result.put("id", map.get("id"));
-		if(map.containsKey("ID"))
+		if (map.containsKey("ID"))
 			result.put("id", map.get("ID"));
-		
 		return result;
 	}
 
@@ -572,8 +632,7 @@ public class DBService {
 	private Map<String, Object> saveWithoutExp(String entityName,
 			JSONObject object) throws JSONException {
 		// 根据实体名字去除配置属性信息
-		ClassMetadata classData = this.hibernateTemplate.getSessionFactory()
-				.getClassMetadata(entityName);
+		ClassMetadata classData = sessionFactory.getClassMetadata(entityName);
 		// 把json对象转换成map
 		Map<String, Object> map = new HashMap<String, Object>();
 		Iterator<String> iter = object.keys();
@@ -621,7 +680,7 @@ public class DBService {
 				map.put(key, value);
 			}
 		}
-		this.hibernateTemplate.saveOrUpdate(entityName, map);
+		sessionFactory.getCurrentSession().saveOrUpdate(entityName, map);
 		return map;
 	}
 
@@ -637,24 +696,25 @@ public class DBService {
 		}
 		return set;
 	}
-	
+
 	@GET
 	@Path("/one/{hql}/{attrname}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public JSONObject queryOne(@PathParam("hql") String query, @PathParam("attrname") String names) {
+	public JSONObject queryOne(@PathParam("hql") String query,
+			@PathParam("attrname") String names) {
 		log.debug(query);
 		JSONObject result = new JSONObject();
-		List list = this.hibernateTemplate.executeFind(new HibernateCall(query,0, 10000));
+		List list = executeFind(sessionFactory.getCurrentSession(),
+				new HibernateCall(query, 0, 10000));
 		if (list.size() != 1) {
 			// 查询到多条数据，抛出异常
 			throw new WebApplicationException(500);
 		}
 		// 对象数组的第一个为返回的对象，后面的内容为对象计算结果
 		String[] snames = names.split(",");
-		Object[] objs = (Object[])list.get(0);
+		Object[] objs = (Object[]) list.get(0);
 		Map<String, Object> map = (Map<String, Object>) objs[0];
-		for(int i = 1; i < objs.length; i++)
-		{
+		for (int i = 1; i < objs.length; i++) {
 			map.put(snames[i - 1], objs[i]);
 		}
 		result = (JSONObject) new JsonTransfer().MapToJson(map);
@@ -666,16 +726,16 @@ public class DBService {
 	@Path("hql/{pageIndex}/{pageSize}")
 	@Produces(MediaType.APPLICATION_JSON)
 	// 获取一页数据
-	public JSONArray postQuery(@PathParam("pageSize") int pageSize,
+	public JSONArray queryPost(@PathParam("pageSize") int pageSize,
 			@PathParam("pageIndex") int pageIndex, String query) {
 		JSONArray array = new JSONArray();
 		log.debug(query + ", size=" + pageSize + ", index=" + pageIndex);
-		//如果pageIndex小于0，直接返回
-		if(pageIndex < 0) {
+		// 如果pageIndex小于0，直接返回
+		if (pageIndex < 0) {
 			return array;
 		}
-		List list = this.hibernateTemplate.executeFind(new HibernateCall(query,
-				pageIndex, pageSize));
+		List list = executeFind(sessionFactory.getCurrentSession(),
+				new HibernateCall(query, pageIndex, pageSize));
 		for (Object obj : list) {
 			// 把单个map转换成JSON对象
 			Map<String, Object> map = (Map<String, Object>) obj;
@@ -695,21 +755,21 @@ public class DBService {
 			@PathParam("pageSize") int pageSize,
 			@PathParam("pageIndex") int pageIndex) {
 		JSONArray array = new JSONArray();
-		log.debug(query + ", names=" + names + ", size=" + pageSize + ", index=" + pageIndex);
-		//如果pageIndex小于0，直接返回
-		if(pageIndex < 0) {
+		log.debug(query + ", names=" + names + ", size=" + pageSize
+				+ ", index=" + pageIndex);
+		// 如果pageIndex小于0，直接返回
+		if (pageIndex < 0) {
 			return array;
 		}
-		List list = this.hibernateTemplate.executeFind(new HibernateCall(query,
-				pageIndex, pageSize));
+		List list = executeFind(sessionFactory.getCurrentSession(),
+				new HibernateCall(query, pageIndex, pageSize));
 		for (Object obj : list) {
-			//属性名为每一个计算项对应的名称
+			// 属性名为每一个计算项对应的名称
 			String[] snames = names.split(",");
-			//select多项时，后面的各项为第一项对象的计算属性
-			Object[] objs = (Object[])obj;
+			// select多项时，后面的各项为第一项对象的计算属性
+			Object[] objs = (Object[]) obj;
 			Map<String, Object> map = (Map<String, Object>) objs[0];
-			for(int i = 1; i < objs.length; i++)
-			{
+			for (int i = 1; i < objs.length; i++) {
 				map.put(snames[i - 1], objs[i]);
 			}
 			JSONObject json = (JSONObject) new JsonTransfer().MapToJson(map);
@@ -723,7 +783,8 @@ public class DBService {
 	@Path("hql/{sumNames}")
 	@Produces(MediaType.APPLICATION_JSON)
 	// 求总数
-	public JSONObject postQuerySum(@PathParam("sumNames") String names, String query) {
+	public JSONObject postQuerySum(@PathParam("sumNames") String names,
+			String query) {
 		JSONObject result = new JSONObject();
 		// 组织sums串
 		String sums = "";
@@ -732,17 +793,14 @@ public class DBService {
 				sums += ",";
 			sums += "sum(" + name + ") as " + name;
 		}
-	    String hql="";
-	    if(!sums.equals(""))
-	    {
-	    	 hql = "select new map(count(*) as Count, " + sums + ") " + query;
-	    }
-	    else
-	    {
-	    	 hql = "select new map(count(*) as Count) " + query;
-	    }
-	    log.debug(hql);
-	    List<Object> l = this.hibernateTemplate.find(hql);
+		String hql = "";
+		if (!sums.equals("")) {
+			hql = "select new map(count(*) as Count, " + sums + ") " + query;
+		} else {
+			hql = "select new map(count(*) as Count) " + query;
+		}
+		log.debug(hql);
+		List<Object> l = sessionFactory.getCurrentSession().find(hql);
 		// 把map转换成json对象
 		Map<String, Object> map = (Map<String, Object>) l.get(0);
 		for (Map.Entry<String, Object> entry : map.entrySet()) {
@@ -759,7 +817,8 @@ public class DBService {
 	@POST
 	@Path("sql/{sumNames}")
 	// 求总数
-	public JSONObject postSQLSum(@PathParam("sumNames") String names, String query) {
+	public JSONObject queryPostSQLSum(@PathParam("sumNames") String names,
+			String query) {
 		// 组织sums串
 		String sums = "";
 		String[] snames = names.split(",");
@@ -768,27 +827,25 @@ public class DBService {
 				sums += ",";
 			sums += "sum(" + name + ") as " + name;
 		}
-	    String sql="";
-	    if(!sums.equals(""))
-	    {
-	    	//前面多添加一个count，以便统一返回数组，而不是单个对象
-	    	sql = "select count(*) as Count, count(*) as Count, " + sums + " from (" + query + ") t";
-	    }
-	    else
-	    {
-	    	//前面多添加一个count，以便统一返回数组，而不是单个对象
-	    	sql = "select count(*) as Count, count(*) as Count " + " from (" + query + ") t";
-	    }
-	    log.debug(sql);
-	    HibernateSQL call = new HibernateSQL(sql);
-		List list = (List) hibernateTemplate.execute(call);
+		String sql = "";
+		if (!sums.equals("")) {
+			// 前面多添加一个count，以便统一返回数组，而不是单个对象
+			sql = "select count(*) as Count, count(*) as Count, " + sums
+					+ " from (" + query + ") t";
+		} else {
+			// 前面多添加一个count，以便统一返回数组，而不是单个对象
+			sql = "select count(*) as Count, count(*) as Count " + " from ("
+					+ query + ") t";
+		}
+		log.debug(sql);
+		HibernateSQL call = new HibernateSQL(sql);
+		List list = findAll(sessionFactory.getCurrentSession(), call);
 		// 把map转换成json对象
-		Object[] objs = (Object[])list.get(0);
+		Object[] objs = (Object[]) list.get(0);
 		Map<String, Object> map = new HashMap<String, Object>();
 		// 先把Count放进去，头一个抛弃掉
 		map.put("Count", objs[1]);
-		for(int i = 2; i < objs.length; i++)
-		{
+		for (int i = 2; i < objs.length; i++) {
 			map.put(snames[i - 2], objs[i]);
 		}
 		JSONObject result = (JSONObject) new JsonTransfer().MapToJson(map);
@@ -796,22 +853,27 @@ public class DBService {
 		return result;
 	}
 
+	private List findAll(org.hibernate.classic.Session session,
+			HibernateSQL call) {
+		return (List) call.doInHibernate(session);
+	}
+
 	@POST
 	@Path("sql/{pageIndex}/{pageSize}")
 	// 按sql方式执行后，获取一页数据，字段名由SQL语句决定
-	public JSONArray postSQLPage(
-			@PathParam("pageSize") int pageSize,
-			@PathParam("pageIndex") int pageIndex,
-			String query) {
+	public JSONArray queryPostSQLPage(@PathParam("pageSize") int pageSize,
+			@PathParam("pageIndex") int pageIndex, String query) {
 		JSONArray array = new JSONArray();
 		log.debug(query + ", size=" + pageSize + ", index=" + pageIndex);
-		//如果pageIndex小于0，直接返回
-		if(pageIndex < 0) {
+		// 如果pageIndex小于0，直接返回
+		if (pageIndex < 0) {
 			return array;
 		}
-		HibernateSQLCall sqlCall = new HibernateSQLCall(query, pageIndex, pageSize);
+		HibernateSQLCall sqlCall = new HibernateSQLCall(query, pageIndex,
+				pageSize);
 		sqlCall.transformer = Transformers.ALIAS_TO_ENTITY_MAP;
-		List<Map<String, Object>> list = this.hibernateTemplate.executeFind(sqlCall);
+		List<Map<String, Object>> list = executeFind(
+				sessionFactory.getCurrentSession(), sqlCall);
 		for (Map<String, Object> map : list) {
 			JSONObject json = (JSONObject) new JsonTransfer().MapToJson(map);
 			array.put(json);
@@ -819,31 +881,29 @@ public class DBService {
 		log.debug(array.toString());
 		return array;
 	}
-	
+
 	@POST
 	@Path("sql/{names}/{pageIndex}/{pageSize}")
 	// 按sql方式执行后，获取一页数据，字段名由前台给定
-	public JSONArray postSQLPage(
-			@PathParam("names") String names,
+	public JSONArray queryPostSQLPage(@PathParam("names") String names,
 			@PathParam("pageSize") int pageSize,
-			@PathParam("pageIndex") int pageIndex,
-			String query) {
+			@PathParam("pageIndex") int pageIndex, String query) {
 		JSONArray array = new JSONArray();
 		log.debug(query + ", size=" + pageSize + ", index=" + pageIndex);
-		//如果pageIndex小于0，直接返回
-		if(pageIndex < 0) {
+		// 如果pageIndex小于0，直接返回
+		if (pageIndex < 0) {
 			return array;
 		}
-		HibernateSQLCall sqlCall = new HibernateSQLCall(query, pageIndex, pageSize);
-		List list = this.hibernateTemplate.executeFind(sqlCall);
+		HibernateSQLCall sqlCall = new HibernateSQLCall(query, pageIndex,
+				pageSize);
+		List list = executeFind(sessionFactory.getCurrentSession(), sqlCall);
 		for (Object obj : list) {
-			//属性名sql语句执行后的别名
+			// 属性名sql语句执行后的别名
 			String[] snames = names.split(",");
-			//把sql语句结果转换成map
-			Object[] objs = (Object[])obj;
+			// 把sql语句结果转换成map
+			Object[] objs = (Object[]) obj;
 			Map<String, Object> map = new HashMap<String, Object>();
-			for(int i = 0; i < objs.length; i++)
-			{
+			for (int i = 0; i < objs.length; i++) {
 				map.put(snames[i], objs[i]);
 			}
 			JSONObject json = (JSONObject) new JsonTransfer().MapToJson(map);
@@ -860,22 +920,22 @@ public class DBService {
 		public HibernateSQL(String sql) {
 			this.sql = sql;
 		}
-		
+
 		public Object doInHibernate(Session session) {
 			Query q = session.createSQLQuery(sql);
 			List result = q.list();
 			return result;
 		}
 	}
-	
+
 	// 执行sql分页查询，结果集形式可以设置
 	class HibernateSQLCall implements HibernateCallback {
 		String sql;
 		int page;
 		int rows;
-		//查询结果转换器，可以转换成Map等。
+		// 查询结果转换器，可以转换成Map等。
 		public ResultTransformer transformer = null;
-		
+
 		public HibernateSQLCall(String sql, int page, int rows) {
 			this.sql = sql;
 			this.page = page;
@@ -884,11 +944,12 @@ public class DBService {
 
 		public Object doInHibernate(Session session) {
 			Query q = session.createSQLQuery(sql);
-			//有转换器，设置转换器
-			if(transformer != null) {
+			// 有转换器，设置转换器
+			if (transformer != null) {
 				q.setResultTransformer(transformer);
 			}
-			List result = q.setFirstResult(page * rows).setMaxResults(rows).list();
+			List result = q.setFirstResult(page * rows).setMaxResults(rows)
+					.list();
 			return result;
 		}
 	}
@@ -912,7 +973,7 @@ public class DBService {
 					// 空值转换成JSON的空对象
 					if (value == null) {
 						value = JSONObject.NULL;
-					}  else if (value instanceof HashMap) {
+					} else if (value instanceof HashMap) {
 						value = MapToJson((Map<String, Object>) value);
 					} else if (value instanceof PersistentSet) {
 						PersistentSet set = (PersistentSet) value;
@@ -952,11 +1013,11 @@ public class DBService {
 			}
 			return array;
 		}
-		
-		//判断已经转换过的内容里是否包含给定对象
+
+		// 判断已经转换过的内容里是否包含给定对象
 		public boolean contains(Map<String, Object> obj) {
-			for(Map<String, Object> map : this.transed) {
-				if(obj == map) {
+			for (Map<String, Object> map : this.transed) {
+				if (obj == map) {
 					return true;
 				}
 			}
@@ -966,11 +1027,11 @@ public class DBService {
 
 	@POST
 	@Path("{entity}/{id}")
-	public String delete(@PathParam("entity") String entityName,
+	public String txDelete(@PathParam("entity") String entityName,
 			@PathParam("id") int id) {
 		String hql = "delete from " + entityName + " where id=" + id;
 		log.debug(hql);
-		this.hibernateTemplate.bulkUpdate(hql);
+		bulkUpdate(sessionFactory.getCurrentSession(), hql);
 		return "ok";
 	}
 
@@ -978,7 +1039,7 @@ public class DBService {
 	@SuppressWarnings("finally")
 	@Path("savefile")
 	@POST
-	public String savefile(byte[] file,
+	public String txSavefile(byte[] file,
 			@QueryParam("FileName") String filename,
 			@QueryParam("BlobId") String blob_id,
 			@QueryParam("EntityName") String EntityName) {
@@ -988,8 +1049,9 @@ public class DBService {
 			map.put("filename", filename);
 			map.put("id", blob_id);
 			map.put("blob", Hibernate.createBlob(file));
-			this.hibernateTemplate.saveOrUpdate(EntityName, map);
-			this.hibernateTemplate.flush();
+			this.sessionFactory.getCurrentSession().saveOrUpdate(EntityName,
+					map);
+			this.sessionFactory.getCurrentSession().flush();
 			result = "";
 		} catch (Exception e) {
 			throw new WebApplicationException(500);
@@ -1000,11 +1062,11 @@ public class DBService {
 
 	// 获得图片
 	@Path("file/{blobid}")
-	public String getimage(@Context HttpServletResponse response,
+	public String getImage(@Context HttpServletResponse response,
 			@PathParam("blobid") String blobid) {
 		try {
-			List list = this.hibernateTemplate.find("from t_blob where id='"
-					+ blobid + "'");
+			List list = sessionFactory.getCurrentSession().find(
+					"from t_blob where id='" + blobid + "'");
 			if (list.size() == 0)
 				return "";
 			Map map = (Map) list.get(0);
@@ -1019,8 +1081,8 @@ public class DBService {
 					+ filename + "\"");
 			// 把文件的内容送入响应流中
 			InputStream is = file.getBinaryStream();
-			OutputStream os = new BufferedOutputStream(response
-					.getOutputStream());
+			OutputStream os = new BufferedOutputStream(
+					response.getOutputStream());
 			transformStream(is, os);
 			is.close();
 			os.close();
@@ -1035,7 +1097,7 @@ public class DBService {
 	@GET
 	@Path("excel/{hql}/{count}/{cols}")
 	// 获取一页数据
-	public String exporttoexcel(@Context HttpServletRequest request,
+	public String queryToExcel(@Context HttpServletRequest request,
 			@Context HttpServletResponse response,
 			@PathParam("hql") String query, @PathParam("count") int count,
 			@PathParam("cols") String cols) {
@@ -1064,7 +1126,7 @@ public class DBService {
 				// 设置内容
 				String[] names = colsStr[titleCol].split(":");
 				// 有别名,设置内容为别名，否则，为字段名。
-				if(names.length > 1) {
+				if (names.length > 1) {
 					cell.setCellValue(names[1]);
 				} else {
 					cell.setCellValue(colsStr[titleCol]);
@@ -1078,32 +1140,33 @@ public class DBService {
 					: (count / pageSize) + 1;
 			for (int i = 0; i <= pageCount; i++) {
 				List list = null;
-				//以sql:开始，说明是执行sql语句，否则，执行hql语句
-				if(query.startsWith("sql:")) {
+				// 以sql:开始，说明是执行sql语句，否则，执行hql语句
+				if (query.startsWith("sql:")) {
 					String sql = query.substring(4);
-					List objList = this.hibernateTemplate
-						.executeFind(new HibernateSQLCall(sql, i, pageSize));
+					List objList = executeFind(
+							sessionFactory.getCurrentSession(),
+							new HibernateSQLCall(sql, i, pageSize));
 					list = new ArrayList();
-					//将sql语句的结果转换成map
+					// 将sql语句的结果转换成map
 					for (Object obj : objList) {
-						//把sql语句结果转换成map
-						Object[] objs = (Object[])obj;
+						// 把sql语句结果转换成map
+						Object[] objs = (Object[]) obj;
 						Map<String, Object> map = new HashMap<String, Object>();
-						for(int j = 0; j < objs.length; j++)
-						{
+						for (int j = 0; j < objs.length; j++) {
 							map.put("col" + j, objs[j]);
 						}
 						list.add(map);
 					}
 				} else {
-					list = this.hibernateTemplate
-						.executeFind(new HibernateCall(query, i, pageSize));
+					list = executeFind(sessionFactory.getCurrentSession(),
+							new HibernateCall(query, i, pageSize));
 				}
 				for (int j = 0; j < list.size(); j++) {
 					Object obj = list.get(j);
 					// 把单个map转换成JSON对象
 					Map<String, Object> map = (Map<String, Object>) obj;
-					JSONObject json =  (JSONObject) new JsonTransfer().MapToJson(map);
+					JSONObject json = (JSONObject) new JsonTransfer()
+							.MapToJson(map);
 					rowNum++;
 					row = sheet.createRow((short) rowNum);
 					for (int z = 0; z < colsStr.length; z++) {
@@ -1111,7 +1174,7 @@ public class DBService {
 						String[] names = colsStr[z].split(":");
 						// 有别名，字段名为第一项，否则，整个是字段名
 						String colName = colsStr[z];
-						if(names.length > 1) {
+						if (names.length > 1) {
 							colName = names[0];
 						}
 						String data = "";
@@ -1134,16 +1197,15 @@ public class DBService {
 			workbook.write(fileOutputStream);
 			// 清缓存
 			response.setStatus(HttpServletResponse.SC_OK);
-			response
-					.setContentType("application/octet-stream;charset=\"gb2312\"");
+			response.setContentType("application/octet-stream;charset=\"gb2312\"");
 			response.addHeader("Content-Disposition", "attachment;filename=\" "
 					+ file.getName() + "\"");
 			// 把文件的内容送入响应流中
 			byte[] b = new byte[1024];
 			BufferedInputStream bis = new BufferedInputStream(
 					new FileInputStream(file));
-			BufferedOutputStream bos = new BufferedOutputStream(response
-					.getOutputStream());
+			BufferedOutputStream bos = new BufferedOutputStream(
+					response.getOutputStream());
 			while (bis.read(b) != -1) {
 				bos.write(b);
 			}
@@ -1159,7 +1221,7 @@ public class DBService {
 	@GET
 	@Path("fapiao/{hql}/{count}")
 	// 获取一页数据
-	public String fapiaotoxml(@Context HttpServletRequest request,
+	public String queryInvoice(@Context HttpServletRequest request,
 			@Context HttpServletResponse response,
 			@PathParam("hql") String query, @PathParam("count") int count) {
 		try {
@@ -1190,14 +1252,15 @@ public class DBService {
 			int pageCount = count % pageSize == 0 ? (count / pageSize)
 					: (count / pageSize) + 1;
 			for (int i = 0; i <= pageCount; i++) {
-				List list = this.hibernateTemplate
-						.executeFind(new HibernateCall(query, i, pageSize));
+				List list = executeFind(sessionFactory.getCurrentSession(),
+						new HibernateCall(query, i, pageSize));
 				for (int j = 0; j < list.size(); j++) {
 					Object obj = list.get(j);
 
 					// 把单个map转换成JSON对象
 					Map<String, Object> map = (Map<String, Object>) obj;
-					JSONObject json =  (JSONObject) new JsonTransfer().MapToJson(map);
+					JSONObject json = (JSONObject) new JsonTransfer()
+							.MapToJson(map);
 					// 添加单个发票元素
 					Element record = xsRecords.addElement("xsRecord");
 					Element head = record.addElement("xsHead");
@@ -1302,8 +1365,8 @@ public class DBService {
 				}
 			}
 			// 返回
-			String path = request.getSession().getServletContext().getRealPath(
-					"");
+			String path = request.getSession().getServletContext()
+					.getRealPath("");
 			// String uuid = UUID.randomUUID().toString();
 			String fname = "WLFP_TY_410181712641199_" + fapiaodam + "_"
 					+ stratPiaoHao + "_" + endPiaoHao;
@@ -1322,8 +1385,8 @@ public class DBService {
 			// 把文件的内容送入响应流中
 			File file = new File(path);
 			InputStream is = new FileInputStream(file);
-			OutputStream os = new BufferedOutputStream(response
-					.getOutputStream());
+			OutputStream os = new BufferedOutputStream(
+					response.getOutputStream());
 			transformStream(is, os);
 			is.close();
 			os.close();
@@ -1362,5 +1425,51 @@ public class DBService {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	// 测试代码
+
+	@GET
+	@Path("testException")
+	// 获取一页数据
+	public String txTestException() throws Exception {
+		bulkSqlUpdate(sessionFactory.getCurrentSession(),
+				"delete from t_test where id=1");
+		bulkSqlUpdate(sessionFactory.getCurrentSession(),
+				"delete from t_test where id=2");
+		throw new XMLParseException();
+	}
+
+	@GET
+	@Path("testRuntime")
+	// 获取一页数据
+	public String txTestRuntime() {
+		bulkSqlUpdate(sessionFactory.getCurrentSession(),
+				"delete from t_test where id=1");
+		bulkSqlUpdate(sessionFactory.getCurrentSession(),
+				"delete from t_test where id=2");
+		throw new ArithmeticException();
+	}
+
+	@GET
+	@Path("test")
+	// 获取一页数据
+	public String txTestSQL() {
+		bulkSqlUpdate(sessionFactory.getCurrentSession(),
+				"delete from t_test where id=1");
+		bulkSqlUpdate(sessionFactory.getCurrentSession(),
+				"delete from t_test where id0=1");
+		return "";
+	}
+
+	@GET
+	@Path("test2")
+	// 获取一页数据
+	public String txTestSQL2() {
+		bulkSqlUpdate(sessionFactory.getCurrentSession(),
+				"delete from t_test where id=1");
+		bulkSqlUpdate(sessionFactory.getCurrentSession(),
+				"delete from t_test where id=2");
+		return "";
 	}
 }
