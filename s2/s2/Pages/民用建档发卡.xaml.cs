@@ -20,7 +20,7 @@ namespace Com.Aote.Pages
 		} 
            private void f_address_MouseEnter(object sender, MouseEventArgs e)
            {
-               f_address.Text = f_area.Text + f_districtname.Text + f_cusDom.Text + "号楼" + f_cusDy.Text + "单元" + f_apartment.Text + "室";
+               f_address.Text = f_area.Text + f_districtname.Text + f_cusDom.Text + f_cusDy.Text + f_cusFloor.Text + f_apartment.Text;
            }
 	}
 }

@@ -39,7 +39,7 @@
             <b:HQLAction Name="UpdateUserFileOut" Type="sql"
 			HQL="{m:Exp Str=$update t_userfiles set  f_cumulativepurchase\=\{kbfee.f_allgasnum-kbfee.f_remaingas\}\,f_metergasnums\=\{kbfee.f_allgasnum-kbfee.f_remaingas\}\,f_zhye\=0 where f_userid \= \'\{kbfee1.DataContext.f_userid\}\'}"
 		    />
-            
+
             <b:HQLAction Name="UpdateUserFileKB" Type="sql"
 			HQL="{m:Exp Str=$update t_userfiles set  f_cumulativepurchase\=\{kbfee.f_newsumgasno\}\,f_metergasnums\=\{kbfee.f_newsumgasno\} where f_userid \= \'\{kbfee1.DataContext.f_inid\}\'}"
 		    />
@@ -62,7 +62,7 @@
                 <b:BatchInfo Source="{m:Exp Str=kbfee}" MethodName="SaveToJson"/>
 
             </b:BatchExcuteAction>-->
-            
+
             <b:BatchExcuteAction Name="SaveAction" CanSave="{m:Exp Str=save2\=>Click!\=null}" WebClientInfo="{StaticResource dbclient}">
                 <b:BatchInfo Source="{m:Exp Str=UpdateUserFileOut}" MethodName="InvokeToJson"/>
                 <b:BatchInfo Source="{m:Exp Str=UpdateUserFileKB}" MethodName="InvokeToJson"/>
@@ -191,7 +191,7 @@
 								IsEnabled="{m:Exp Str='inkbusers.f_gasmeterstyle \=\=$机表$  and !kbfee.HasErrors'}"
 							
 									 		 
-									  Width="65" />--> 
+									  Width="65" />-->
                         <Button x:Name="save2" Content="保  存" Margin="5" 
 										 
 								IsEnabled="{m:Exp Str='inkbusers.f_gasmeterstyle \=\=$卡表$ and !kbfee.HasErrors'}"
@@ -275,7 +275,7 @@
                             </a:Data.Prop>
                         </TextBox>
                         <!--从卡上读购气次数{m:Exp Str=card.BuyTimes\=>ReadCompleted+1}-->
-                        <TextBox Text="{m:Bind Path=f_outgasno}" FontWeight="Bold" Foreground="Red" Grid.Column="5" Margin="0,5,0,0" TextWrapping="Wrap" Grid.ColumnSpan="1" Grid.Row="3" Height="Auto" VerticalAlignment="Stretch"  >
+                        <TextBox IsReadOnly="True" Text="{m:Bind Path=f_outgasno}" FontWeight="Bold" Foreground="Red" Grid.Column="5" Margin="0" TextWrapping="Wrap" Grid.ColumnSpan="1" Grid.Row="3" Height="25" VerticalAlignment="Bottom"  >
                             <a:Data.Prop>
                                 <o:PropertySetter PropertyName="f_outgasno" Default="0" NoDependValue="{m:Exp Str=kbfee1.DataContext.f_remaingas}"
 									/>
@@ -283,7 +283,7 @@
                             </a:Data.Prop>
                         </TextBox>
 
-                        
+
                         <TextBlock Text="卡内气量：" Margin="0" Grid.Row="9" TextWrapping="Wrap" TextAlignment="Right" FontSize="13.333" Grid.Column="4" Height="25"/>
                         <TextBox Grid.Column="5" Foreground="Red" Text="{m:Bind Path=f_kaneqiliang}" Margin="0" TextWrapping="Wrap" Grid.ColumnSpan="1" Grid.Row="9" Height="25" IsReadOnly="True" >
                             <a:Data.Prop>
@@ -403,7 +403,8 @@
                         <TextBlock Text="当前用气指数："  TextWrapping="Wrap" TextAlignment="Right" Grid.Row="2" Margin="0,8,148,27" Height="25" Grid.Column="4" HorizontalAlignment="Right" Width="118" Grid.ColumnSpan="2" Grid.RowSpan="2"/>
                         <TextBox Text="{m:Bind Path=f_watchreading}"  Grid.Column="5" Margin="0,6,0,0" Grid.Row="2" HorizontalAlignment="Stretch" Width="Auto" Height="Auto"  VerticalAlignment="Stretch" >
                             <a:Data.Prop>
-                                <o:PropertySetter PropertyName="f_watchreading" NotNull="True" Value="{m:Exp Str=pipelines.SelectedItem.lastinputgasnum}"/>
+                                <o:PropertySetter PropertyName="f_watchreading" NotNull="True" 
+                                                  ValidationVal="{m:Exp Str= kbfee.f_watchreading ^\= kbfee.f_allgasnum \:True\,False}" ErrorMessage="输入当前用气指数不能大于累计购气量"/>
                             </a:Data.Prop>
                         </TextBox>
                         <TextBlock Text="开户日期：" Margin="5,3,5,2" TextWrapping="Wrap" TextAlignment="Right" Grid.Row="4" Width="130" Height="25"/>
