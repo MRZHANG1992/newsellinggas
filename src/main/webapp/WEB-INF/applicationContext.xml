@@ -61,3 +61,4 @@
 	<bean id="Single"
 		class="com.aote.expression.paramprocessor.SingleProcessor">
 	</bean>
+</beans>
