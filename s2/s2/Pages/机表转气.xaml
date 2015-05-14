@@ -218,7 +218,7 @@
 
                         <Button x:Name="save" Content="保  存" Margin="5" 
 										 
-								IsEnabled="{m:Exp Str='!kbfee.HasErrors'}"
+								IsEnabled="{m:Exp Str=kbfee1.DataContext.f_outmoney \>0 and !kbfee.HasErrors}"
                                 Click="{m:Exp Str=SaveAction.Invoke();kbfee1.DataContext.New()}"
 									  Width="65" />
                         <Button Content="撤  销" Margin="5" FontSize="12" Click="{m:Exp Str=kbfee1.DataContext.New()}" Width="50"/>
@@ -271,7 +271,7 @@
                         <TextBox Text="{m:Bind Path=f_yhju}" FontWeight="Bold" Foreground="Red" IsReadOnly="True" Grid.Column="2" Margin="139,6,1,1" Grid.Row="2" TextWrapping="Wrap" Height="Auto" VerticalAlignment="Stretch" Grid.ColumnSpan="2" >
                             <a:Data.Prop>
                                 <o:PropertySetter PropertyName="f_yhju"
-									NoDependValue="{m:Exp Str=pipelines.SelectedItem.f_zhye}"	ValidationVal="{m:Exp Str= kbfee.f_yhju \>0 \:True\,False}" ErrorMessage="转出金额必须大于0" />
+									NoDependValue="{m:Exp Str=pipelines.SelectedItem.f_zhye}"	/>
                             </a:Data.Prop>
                         </TextBox>
                         <TextBlock Text="付手续费方：" Grid.Column="3" Margin="148,2,2,3" Grid.Row="13" TextWrapping="Wrap" TextAlignment="Right" Height="25" RenderTransformOrigin="0.503,0.76" Grid.ColumnSpan="2"/>

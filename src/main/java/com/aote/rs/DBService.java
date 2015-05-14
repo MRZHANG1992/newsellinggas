@@ -576,12 +576,12 @@ public class DBService {
 				}
 			} else if (value instanceof JSONArray) {
 				// Json数组转换成一对多关系的Set
-				Set<Map<String, Object>> set = saveSet((JSONArray) value);
+				Set<Map<String, Object>> set = saveSet(session, (JSONArray) value);
 				map.put(key, set);
 			} else if (value instanceof JSONObject) {
 				JSONObject obj = (JSONObject) value;
 				String type = (String) obj.get("EntityType");
-				Map<String, Object> set = saveWithoutExp(type,
+				Map<String, Object> set = saveWithoutExp(session, type,
 						(JSONObject) value);
 				map.put(key, set);
 			} else if (propType != null
@@ -624,12 +624,12 @@ public class DBService {
 		if (map.containsKey("id"))
 			result.put("id", map.get("id"));
 		if (map.containsKey("ID"))
-			result.put("id", map.get("ID"));
+			result.put("ID", map.get("ID"));
 		return result;
 	}
 
 	// 保存JsonObject，并转换为Map，保存时，不做后台表达式运算，用于一对多关系中的子的保存
-	private Map<String, Object> saveWithoutExp(String entityName,
+	private Map<String, Object> saveWithoutExp(Session session,String entityName,
 			JSONObject object) throws JSONException {
 		// 根据实体名字去除配置属性信息
 		ClassMetadata classData = sessionFactory.getClassMetadata(entityName);
@@ -653,7 +653,7 @@ public class DBService {
 				}
 			} else if (value instanceof JSONArray) {
 				// Json数组转换成一对多关系的Set
-				Set<Map<String, Object>> set = saveSet((JSONArray) value);
+				Set<Map<String, Object>> set = saveSet(session, (JSONArray) value);
 				map.put(key, set);
 			} else if (propType != null
 					&& (propType instanceof DateType || propType instanceof TimeType)) {
@@ -673,25 +673,25 @@ public class DBService {
 			} else if (value instanceof JSONObject) {
 				JSONObject obj = (JSONObject) value;
 				String type = (String) obj.get("EntityType");
-				Map<String, Object> set = saveWithoutExp(type,
+				Map<String, Object> set = saveWithoutExp(session,type,
 						(JSONObject) value);
 				map.put(key, set);
 			} else {
 				map.put(key, value);
 			}
 		}
-		sessionFactory.getCurrentSession().saveOrUpdate(entityName, map);
+		session.saveOrUpdate(entityName, map);
 		return map;
 	}
 
 	// 保存JSONArray里的对象，并转换为Set
-	private Set<Map<String, Object>> saveSet(JSONArray array)
+	private Set<Map<String, Object>> saveSet(Session session, JSONArray array)
 			throws JSONException {
 		Set<Map<String, Object>> set = new HashSet<Map<String, Object>>();
 		for (int i = 0; i < array.length(); i++) {
 			JSONObject obj = (JSONObject) array.get(i);
 			String type = (String) obj.get("EntityType");
-			Map<String, Object> map = saveWithoutExp(type, obj);
+			Map<String, Object> map = saveWithoutExp(session, type, obj);
 			set.add(map);
 		}
 		return set;
