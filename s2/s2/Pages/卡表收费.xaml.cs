@@ -11,39 +11,33 @@ using Com.Aote.ObjectTools;
 using System.Linq;
 using System.Net;
 using System.Json;
+using Com.Aote.Behaviors;
+using Com.Aote.Controls;
 
 namespace Com.Aote.Pages
 {
     public partial class 卡表收费 : UserControl
     {
+        GeneralObject goPopup = new GeneralObject();
+ 
         PagedList listwh = new PagedList();
+
         public 卡表收费()
         {
             InitializeComponent();
+            goPopup.AddProperty("PreGasOnCard");
+            goPopup.AddProperty("GasAddedOn");
+            goPopup.AddProperty("CurGasOnCard");
+            goPopup.AddProperty("GasPurchased");
+            goPopup.AddProperty("IsBalanced");
+            goPopup.AddProperty("IsNotBalanced");
+            goPopup.AddProperty("IsOccupied");
+            goPopup.AddProperty("Hint");
         }
+
+
         string userid = "";
-        private void NewGeneralICCard_Completed(object sender, System.ComponentModel.AsyncCompletedEventArgs e)
-        {
 
-            busy.IsBusy = true;
-            NewGeneralICCard card = (from p in loader.Res where p.Name.Equals("card") select p).First() as NewGeneralICCard;
-            if (card.State == State.LoadError)
-            {
-                //WebClientInfo wci = Application.Current.Resources["server"] as WebClientInfo;
-                //string str = wci.BaseAddress + "returns" + f_userid.Text;
-                //Uri uri = new Uri(str);
-                // WebClient client = new WebClient();
-                //   client.DownloadStringCompleted += client_DownloadStringCompleted;
-                //client.DownloadStringAsync(uri);
-                MessageBox.Show("写卡失败,请读卡核对气量!");
-          //  }
-          //  else
-          //  {
-            //    print.Print();
-
-            }
-            busy.IsBusy = false;
-        }
         private void ui_pregas_LostFocus(object sender, RoutedEventArgs e)
         {
             ui_chargeBusy.IsBusy = true;
@@ -76,12 +70,6 @@ namespace Com.Aote.Pages
             if (e.Error == null)
             {
                 JsonObject items = JsonValue.Parse(e.Result) as JsonObject;
-                //如果有错误信息弹出
-                if(items.Keys.Contains("error"))
-                {
-                    MessageBox.Show(items["error"]);
-                    return;
-                }
                 ui_stair1amont.Text = items["f_stair1amount"].ToString();
                 ui_stair2amont.Text = items["f_stair2amount"].ToString();
                 ui_stair3amont.Text = items["f_stair3amount"].ToString();
@@ -105,8 +93,8 @@ namespace Com.Aote.Pages
                 ui_stardate.Text = items["f_stardate"].ToString().Substring(1, 10);
                 ui_enddate.Text = items["f_enddate"].ToString().Substring(1, 10);
                 ui_grossproceeds.Text = items["f_totalcost"].ToString();
-                ui_preamount.Text = items["f_chargenum"].ToString();
-                ui_totalcost.Text = items["f_totalcost"].ToString();
+                ui_preamount.Text = Math.Round(double.Parse(items["f_chargenum"].ToString()), 2).ToString();
+                ui_totalcost.Text = Math.Round(double.Parse(items["f_totalcost"].ToString()), 2).ToString();
             }
             else
             {
@@ -139,6 +127,7 @@ namespace Com.Aote.Pages
             client1.DownloadStringCompleted += client1_DownloadStringCompleted;
             client1.DownloadStringAsync(uri);
         }
+
         double pregas = 0;
         private void client1_DownloadStringCompleted(object sender, DownloadStringCompletedEventArgs e)
         {
@@ -146,12 +135,6 @@ namespace Com.Aote.Pages
             if (e.Error == null)
             {
                 JsonObject items = JsonValue.Parse(e.Result) as JsonObject;
-                //如果有错误信息弹出
-                if (items.Keys.Contains("error"))
-                {
-                    MessageBox.Show(items["error"]);
-                    return;
-                }
                 pregas = Math.Floor(double.Parse(items["chargeamont"].ToString()));
                 WebClientInfo wci = (WebClientInfo)Application.Current.Resources["chargeserver"];
                 string str = wci.BaseAddress + "/num/" + userid + "/" + pregas;
@@ -197,7 +180,7 @@ namespace Com.Aote.Pages
                 }
                 ui_stardate.Text = items["f_stardate"].ToString().Substring(1, 10);
                 ui_enddate.Text = items["f_enddate"].ToString().Substring(1, 10);
-                ui_preamount.Text = items["f_chargenum"].ToString();
+                ui_preamount.Text = Math.Round(double.Parse(items["f_chargenum"].ToString()), 2).ToString(); 
                 ui_totalcost.Text = Math.Round(double.Parse(items["f_totalcost"].ToString()), 2).ToString();
                 ui_pregas.Text = pregas.ToString();
 
@@ -219,6 +202,118 @@ namespace Com.Aote.Pages
             }
         }
 
+      
 
+        private void fapiaoNum1_TextChanged(object sender, TextChangedEventArgs e)
+        {
+           // FapiaoNum.Text =  (int.Parse(fapiaoNum1.Text)).ToString("D8");
+        }
+
+        /// <summary>
+        /// 界面写卡成功后
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void NewGeneralICCard_Completed(object sender, System.ComponentModel.AsyncCompletedEventArgs e)
+        {
+            //显示校验框
+            VerificationPopUp.Visibility = Visibility.Visible;
+            goPopup.SetPropertyValue("PreGasOnCard", TextGasOnCard.Text, true);
+            GeneralObject go = kbfee1.DataContext as GeneralObject;
+            goPopup.SetPropertyValue("GasPurchased", go.GetPropertyValue("f_pregas").ToString(), true);
+            if (go.GetPropertyValue("f_surplusgas") == null)
+                goPopup.SetPropertyValue("GasAddedOn", "0", true);
+            else
+                goPopup.SetPropertyValue("GasAddedOn", go.GetPropertyValue("f_surplusgas").ToString(), true);
+            goPopup.SetPropertyValue("IsBalanced", "False", true);
+            goPopup.SetPropertyValue("IsNotBalanced", "False", true);
+            goPopup.SetPropertyValue("IsOccupied", "True", true);
+            goPopup.SetPropertyValue("Hint", "", true);
+            VerificationPopUp.DataContext = goPopup;
+            //读卡
+            ReadChip(e, null);
+        }
+
+        //写卡
+        private void WriteChip(object sender, RoutedEventArgs e)
+        {
+            goPopup.SetPropertyValue("IsOccupied", "True", true);
+            NewGeneralICCard chip = (from p in loader.Res where p.Name.Equals("chip") select p).First() as NewGeneralICCard;
+            chip.Completed += chip_Completed;
+            chip.SellGas();
+        }
+
+        void chip_Completed(object sender, System.ComponentModel.AsyncCompletedEventArgs e)
+        {
+            NewGeneralICCard chip = (from p in loader.Res where p.Name.Equals("chip") select p).First() as NewGeneralICCard;
+            chip.Completed -= chip_Completed;
+            //继续读卡
+            ReadChip(e, null);
+        }
+
+        //读卡
+        private void ReadChip(object sender, RoutedEventArgs e)
+        {
+            goPopup.SetPropertyValue("IsOccupied", "True", true);
+            NewGeneralICCard chip = (from p in loader.Res where p.Name.Equals("chip") select p).First() as NewGeneralICCard;
+            chip.ReadCompleted += chip_ReadCompleted;
+            chip.ReadCard();
+        }
+
+        void chip_ReadCompleted(object sender, System.ComponentModel.AsyncCompletedEventArgs e)
+        {
+            NewGeneralICCard chip = (from p in loader.Res where p.Name.Equals("chip") select p).First() as NewGeneralICCard;
+            chip.ReadCompleted -= chip_ReadCompleted;
+            goPopup.SetPropertyValue("IsOccupied", "False", true);
+            if (chip.State == State.LoadError)
+            {
+                goPopup.SetPropertyValue("Hint", "卡操作失败，请重试。", true);
+                ButtonReadChip.IsEnabled = true;
+            }
+            else
+            {
+                goPopup.SetPropertyValue("Hint", "", true);
+                goPopup.SetPropertyValue("CurGasOnCard", chip.Gas.ToString(), true);
+                int PreGasOnCard = int.Parse(goPopup.GetPropertyValue("PreGasOnCard").ToString());
+                int GasPurchased = int.Parse(goPopup.GetPropertyValue("GasPurchased").ToString());
+                int preGasOnCard = int.Parse(goPopup.GetPropertyValue("GasAddedOn").ToString());
+                if (chip.Gas == PreGasOnCard + GasPurchased + preGasOnCard)
+                {
+                    goPopup.SetPropertyValue("IsBalanced", "True", true);
+                    goPopup.SetPropertyValue("IsNotBalanced", "False", true);
+                }
+                else
+                {
+                    goPopup.SetPropertyValue("IsBalanced", "False", true);
+                    goPopup.SetPropertyValue("IsNotBalanced", "True", true);
+                }
+                //为下次写做准备
+                chip.Gas = PreGasOnCard + GasPurchased + preGasOnCard;
+            }
+        }
+
+        void Print(object sender, RoutedEventArgs e)
+        {
+            WebClientInfo wci = Application.Current.Resources["dbclient"] as WebClientInfo;
+            WebClient client = new WebClient();
+            client.UploadStringCompleted += wc_UploadStringCompleted;
+            client.UploadStringAsync(new Uri(wci.BaseAddress), String.Format("[{{\"operator\":\"sql\",\"data\":\"update t_fapiaoinfos set f_fapiaostatue='已用' where f_invoicenum={0}\"}}]", fapiaoNum1.Text));
+        }
+
+        void wc_UploadStringCompleted(object sender, UploadStringCompletedEventArgs e)
+        {
+            (sender as WebClient).UploadStringCompleted -= wc_UploadStringCompleted;
+            print.State = State.Start;
+            print.Print();
+            VerificationPopUp.Visibility = Visibility.Collapsed;
+        }
+
+        void NoPrint(object sender, RoutedEventArgs e)
+        {
+            //打印状态变成End，清界面
+            print.State = State.Start;
+            print.State = State.End;
+            VerificationPopUp.Visibility = Visibility.Collapsed;
+        }
     }
 }

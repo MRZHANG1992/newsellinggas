@@ -10,9 +10,9 @@ using System.Windows.Shapes;
 
 namespace Com.Aote.Pages
 {
-	public partial class 冲正 : UserControl
+	public partial class 售气收费报表测试 : UserControl
 	{
-		public 冲正()
+		public 售气收费报表测试()
 		{
 			// Required to initialize variables
 			InitializeComponent();
